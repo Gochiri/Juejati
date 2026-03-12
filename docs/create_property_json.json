@@ -1,0 +1,20 @@
+{
+  "locationId": "{{ $json.ghlData.locationId }}",
+  "properties": {
+    "tokko_id": "{{ $json.ghlData.propiedades['Tokko ID'] }}",
+    "codigo": "{{ $json.ghlData.propiedades.Codigo }}",
+    "tipo_de_propiedad": "{{ $json.ghlData.propiedades.Tipo_de_propiedad }}",
+    "tipo_de_operacion": "{{ $json.ghlData.propiedades.Tipo_de_operacion }}",
+    "titulo": "{{ $json.ghlData.propiedades.Titulo }}",
+    "direccion": "{{ $json.ghlData.propiedades.Direccion }}",
+    "precio": {{ $json.ghlData.propiedades.Precio | parseFloat }},
+    "moneda": "{{ $json.ghlData.propiedades.Moneda }}",
+    "habitaciones": "{{ $json.ghlData.propiedades.Habitaciones }}",
+    "baos": "{{ $json.ghlData.propiedades['Baños'] }}",
+    "area_construida": "{{ $json.ghlData.propiedades.Area_construida }}",
+    "distrito": "{{ $json.ghlData.propiedades.Distrito }}",
+    "asesor": "{{ $json.ghlData.propiedades.Asesor }}",
+    "ficha_tokko": "{{ $json.ghlData.propiedades['Ficha Tokko'] }}",
+    "imagen": "{{ $json.ghlData.propiedades.imagen }}"
+  }
+}

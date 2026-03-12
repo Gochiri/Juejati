@@ -1,0 +1,173 @@
+{
+  "name": "NODOS NUEVOS - Memoria Contextual Stale Opp",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-modo-stale",
+              "leftValue": "={{ $json.modo }}",
+              "rightValue": "REACTIVACION_STALE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-modo-stale",
+      "name": "Check if Stale Mode",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "notes": "Verifica si el modo es REACTIVACION_STALE para activar memoria contextual"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://services.leadconnectorhq.com/conversations/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "contactId",
+              "value": "={{ $json.contact_id }}"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            },
+            {
+              "name": "sortOrder",
+              "value": "desc"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-conversation-history",
+      "name": "Get Conversation History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ghl-api-auth",
+          "name": "GHL API Auth"
+        }
+      },
+      "notes": "Obtiene los últimos 20 mensajes de la conversación del contacto desde GHL API"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse conversation history para el AI Agent\nconst conversationData = $input.item.json;\nconst messages = conversationData.messages || [];\n\n// Extraer últimos 10 mensajes relevantes\nconst recentMessages = messages\n  .slice(0, 10)\n  .map(msg => ({\n    role: msg.direction === 'inbound' ? 'user' : 'assistant',\n    content: msg.body || msg.messageText || '',\n    timestamp: msg.dateAdded,\n    type: msg.type\n  }))\n  .filter(msg => {\n    // Filtrar mensajes vacíos o de sistema\n    if (!msg.content || msg.content.length === 0) return false;\n    if (msg.type === 'TYPE_CALL') return false; // Excluir llamadas\n    return true;\n  });\n\n// Crear resumen de contexto para el AI\nconst contextSummary = {\n  total_messages: recentMessages.length,\n  last_interaction: recentMessages[0]?.timestamp || null,\n  has_history: recentMessages.length > 0\n};\n\n// Retornar datos originales + historial parseado\nreturn {\n  json: {\n    ...$input.item.json.body, // Datos originales del webhook\n    conversation_history: recentMessages,\n    context_summary: contextSummary\n  }\n};"
+      },
+      "id": "parse-conversation-history",
+      "name": "Parse Conversation History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200],
+      "notes": "Parsea el historial de mensajes y extrae los últimos 10 más relevantes"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-routes",
+      "name": "Merge Routes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 300],
+      "notes": "Une la ruta con contexto y la ruta sin contexto antes del AI Agent"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check if Stale Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Stale Mode": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation History",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Routes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Conversation History": {
+      "main": [
+        [
+          {
+            "node": "Parse Conversation History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Conversation History": {
+      "main": [
+        [
+          {
+            "node": "Merge Routes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Routes": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (AGENT1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

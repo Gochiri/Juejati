@@ -1,0 +1,93 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "queryzona",
+              "type": "string",
+              "description": "Nombre de la zona/barrio a buscar (ej: Belgrano, Palermo)"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        1344
+      ],
+      "id": "b3cfbae9-a98d-4508-865f-716967867e07",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.tokkobroker.com/api/v1/location/quicksearch/?lang=es_ar&format=json&q={{ $json.queryzona }}&key=aca3b014e5c3eb0dcc7c6e8ab7e16864041435cf",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        144,
+        1344
+      ],
+      "id": "6a5dbdf5-89c7-4d99-a89c-e11349162fa9",
+      "name": "HTTP Request - Tokko API"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// PROCESAR RESULTADO DE BÚSQUEDA DE ZONA - CORREGIDO PARA TOKKO API\n// ═══════════════════════════════════════════════════════\n\nconst queryzona = $('When Executed by Another Workflow').item.json.queryzona;\nconst responseData = $input.item.json;\n\nconsole.log('═══════════════════════════════════════════════════════');\nconsole.log('🗺️  GET_ZONA - BÚSQUEDA DE ZONA');\nconsole.log('═══════════════════════════════════════════════════════');\nconsole.log('📍 Query original:', queryzona);\n\n// Validar estructura de respuesta\nif (!responseData.objects) {\n  console.log('⚠️  Respuesta sin campo \"objects\"');\n  console.log('📦 Estructura recibida:', Object.keys(responseData));\n  console.log('═══════════════════════════════════════════════════════');\n  \n  return {\n    zona_id: null,\n    zona_name: queryzona,\n    zona_type: 'unknown',\n    query_original: queryzona,\n    error: 'Respuesta del API sin campo objects',\n    raw_response: responseData\n  };\n}\n\nconst resultados = responseData.objects;\nconsole.log('📊 Resultados encontrados:', resultados.length);\nconsole.log('📈 Total en base de datos:', responseData.meta?.total_count || 'N/A');\n\n// Mostrar primeros 10 resultados para debug\nif (resultados.length > 0) {\n  console.log('\\n🔍 Primeros 10 resultados:');\n  resultados.slice(0, 10).forEach((r, index) => {\n    console.log(`  ${index + 1}. [${r.type}] ${r.name} (ID: ${r.id})`);\n    console.log(`     📍 ${r.full_location}`);\n  });\n  console.log('');\n}\n\n// ═══════════════════════════════════════════════════════\n// LÓGICA DE FILTRADO PARA API TOKKO\n// Tipos disponibles: \"Barrio\", \"Localidad\", \"Área\"\n// ═══════════════════════════════════════════════════════\n\nlet zonaEncontrada = null;\nlet metodoSeleccion = '';\n\nif (resultados.length === 0) {\n  console.log('❌ No se encontraron resultados');\n  metodoSeleccion = 'sin_resultados';\n} else {\n  const queryLower = queryzona.toLowerCase().trim();\n  \n  // PRIORIDAD 1: Coincidencia exacta + tipo \"Barrio\"\n  zonaEncontrada = resultados.find(r => \n    r.name.toLowerCase().trim() === queryLower && r.type === 'Barrio'\n  );\n  if (zonaEncontrada) {\n    metodoSeleccion = 'coincidencia_exacta_barrio';\n    console.log('✅ Método 1: Coincidencia exacta + Barrio');\n  }\n  \n  // PRIORIDAD 2: Coincidencia exacta (cualquier tipo)\n  if (!zonaEncontrada) {\n    zonaEncontrada = resultados.find(r => \n      r.name.toLowerCase().trim() === queryLower\n    );\n    if (zonaEncontrada) {\n      metodoSeleccion = 'coincidencia_exacta';\n      console.log('✅ Método 2: Coincidencia exacta (tipo: ' + zonaEncontrada.type + ')');\n    }\n  }\n  \n  // PRIORIDAD 3: Primera zona tipo \"Barrio\"\n  if (!zonaEncontrada) {\n    zonaEncontrada = resultados.find(r => r.type === 'Barrio');\n    if (zonaEncontrada) {\n      metodoSeleccion = 'primer_barrio';\n      console.log('⚠️  Método 3: Primer Barrio encontrado');\n    }\n  }\n  \n  // PRIORIDAD 4: Coincidencia parcial en \"Barrio\"\n  if (!zonaEncontrada) {\n    zonaEncontrada = resultados.find(r => \n      r.type === 'Barrio' && \n      r.name.toLowerCase().includes(queryLower)\n    );\n    if (zonaEncontrada) {\n      metodoSeleccion = 'coincidencia_parcial_barrio';\n      console.log('⚠️  Método 4: Coincidencia parcial en Barrio');\n    }\n  }\n  \n  // PRIORIDAD 5: Primera zona tipo \"Localidad\" (más general que Barrio)\n  if (!zonaEncontrada) {\n    zonaEncontrada = resultados.find(r => r.type === 'Localidad');\n    if (zonaEncontrada) {\n      metodoSeleccion = 'primera_localidad';\n      console.log('⚠️  Método 5: Primera Localidad encontrada');\n    }\n  }\n  \n  // PRIORIDAD 6: Primer resultado (fallback absoluto)\n  if (!zonaEncontrada) {\n    zonaEncontrada = resultados[0];\n    metodoSeleccion = 'primer_resultado';\n    console.log('⚠️  Método 6: Fallback - Primer resultado');\n  }\n}\n\n// ═══════════════════════════════════════════════════════\n// RESULTADO FINAL\n// ═══════════════════════════════════════════════════════\n\nif (zonaEncontrada) {\n  console.log('\\n🎯 Zona seleccionada:');\n  console.log('   ID:', zonaEncontrada.id);\n  console.log('   Nombre:', zonaEncontrada.name);\n  console.log('   Tipo:', zonaEncontrada.type);\n  console.log('   Ubicación:', zonaEncontrada.full_location);\n  console.log('   Método:', metodoSeleccion);\n} else {\n  console.log('\\n❌ No se pudo seleccionar ninguna zona');\n}\n\nconsole.log('═══════════════════════════════════════════════════════');\n\n// Retornar datos estructurados\nreturn {\n  // Datos principales\n  zona_id: zonaEncontrada ? zonaEncontrada.id : null,\n  zona_name: zonaEncontrada ? zonaEncontrada.name : queryzona,\n  zona_type: zonaEncontrada ? zonaEncontrada.type : 'unknown',\n  \n  // Metadata\n  query_original: queryzona,\n  metodo_seleccion: metodoSeleccion,\n  total_resultados: resultados.length,\n  total_en_db: responseData.meta?.total_count || null,\n  \n  // Información adicional de la zona\n  zona_full_location: zonaEncontrada?.full_location || null,\n  zona_resource_uri: zonaEncontrada?.resource_uri || null,\n  \n  // Para debug - solo primeros 50 para no sobrecargar\n  todas_las_zonas: resultados.slice(0, 50).map(r => ({\n    id: r.id,\n    name: r.name,\n    type: r.type,\n    location: r.full_location\n  })),\n  \n  // Indicador de éxito\n  success: zonaEncontrada !== null\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        1344
+      ],
+      "id": "37768773-5dbd-4b13-aabc-38793cd8982e",
+      "name": "Process Zone Result - Enhanced"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Tokko API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Tokko API": {
+      "main": [
+        [
+          {
+            "node": "Process Zone Result - Enhanced",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "queryzona": "Belgrano"
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5b2372f2635dd70951ede88a3062b4f50e8510b33f9ee8dc8789ff1da1d702e4"
+  }
+}
