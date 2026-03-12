@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { runAgent } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
+import { syncProperties } from './sync.js';
 import { CoreMessage } from 'ai';
 
 dotenv.config();
@@ -59,6 +60,40 @@ app.get('/health', (req, res) => {
   res.send('Juejati AI Backend is running.');
 });
 
+// Sync manual: POST /sync (proteger con un secret en producción)
+let syncRunning = false;
+app.post('/sync', async (_req, res) => {
+  if (syncRunning) {
+    return res.status(409).json({ error: 'Sync already running' });
+  }
+  syncRunning = true;
+  try {
+    const result = await syncProperties();
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error('❌ Sync error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    syncRunning = false;
+  }
+});
+
+// Sync automático cada 6 horas
+const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+setInterval(async () => {
+  if (syncRunning) return;
+  syncRunning = true;
+  try {
+    console.log('⏰ Scheduled sync starting...');
+    await syncProperties();
+  } catch (err) {
+    console.error('❌ Scheduled sync error:', err);
+  } finally {
+    syncRunning = false;
+  }
+}, SYNC_INTERVAL_MS);
+
 app.listen(PORT, () => {
   console.log(`🚀 AI Backend listening on port ${PORT}`);
+  console.log(`🔄 Property sync scheduled every 6 hours`);
 });
