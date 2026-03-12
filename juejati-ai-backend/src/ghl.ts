@@ -16,11 +16,43 @@ export async function getConversationHistory(contactId: string, limit = 20) {
   return data.messages || [];
 }
 
-export async function sendMessage(contactId: string, message: string) {
+async function getOrCreateConversationId(contactId: string): Promise<string> {
+  // Search for existing conversation for this contact
+  const searchUrl = `${GHL_API_BASE}/conversations/search?contactId=${contactId}&limit=1`;
+  const res = await fetch(searchUrl, { method: 'GET', headers });
+  if (!res.ok) throw new Error(`GHL Error searching conversations: ${res.statusText}`);
+  const data = await res.json();
+
+  if (data.conversations && data.conversations.length > 0) {
+    return data.conversations[0].id;
+  }
+
+  // If no conversation exists, create one
+  const createRes = await fetch(`${GHL_API_BASE}/conversations`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ contactId }),
+  });
+  if (!createRes.ok) throw new Error(`GHL Error creating conversation: ${createRes.statusText}`);
+  const created = await createRes.json();
+  return created.conversation.id;
+}
+
+export async function sendMessage(contactId: string, message: string, type: string = 'WhatsApp') {
+  const conversationId = await getOrCreateConversationId(contactId);
+
   const url = `${GHL_API_BASE}/conversations/messages`;
-  // We need the conversationId, but GHL v2 lets you send via channel/contact sometimes 
-  // For safety, assume custom mapping or fetch conversationId first. 
-  // Let's assume we find it or have it from the webhook.
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      type, // Adjust based on source channel if needed
+      conversationId,
+      message,
+    }),
+  });
+  if (!res.ok) throw new Error(`GHL Error sending message: ${res.statusText}`);
+  return res.json();
 }
 
 export async function addContactTag(contactId: string, tag: string) {

@@ -21,12 +21,13 @@ app.post('/webhook/ghl', async (req, res) => {
     // GHL sends type, contact_id, message, etc.
     const contactId = payload.contact_id;
     const messageBody = payload.body || payload.message?.body;
+    const channel = payload.type || payload.channel || 'WhatsApp';
 
     if (!contactId || !messageBody) {
       return res.status(400).send('Missing contact_id or message body');
     }
 
-    console.log(`Received message from ${contactId}: ${messageBody}`);
+    console.log(`📩 [${channel}] Message from ${contactId}: ${messageBody}`);
 
     // Acknowledge webhook quickly to avoid GHL retries
     res.status(200).send({ success: true });
@@ -38,17 +39,18 @@ app.post('/webhook/ghl', async (req, res) => {
     const history: CoreMessage[] = rawHistory.reverse().map((msg: any) => ({
       role: msg.direction === 'inbound' ? 'user' : 'assistant',
       content: msg.body || msg.messageText || ''
-    }));
+    })).filter((m: CoreMessage) => m.content !== '');
 
     // 2. Run Agent
+    console.log(`🤖 Running agent for ${contactId}...`);
     const agentResponse = await runAgent(contactId, history, messageBody);
 
     // 3. Send Response back to GHL
-    await sendMessage(contactId, agentResponse);
+    await sendMessage(contactId, agentResponse, channel);
 
-    console.log(`Successfully replied to ${contactId}`);
+    console.log(`✅ Successfully replied to ${contactId} via ${channel}`);
   } catch (err) {
-    console.error('Error handling webhook:', err);
+    console.error('❌ Error handling webhook:', err);
     // If we hadn't already sent a response, we would do it here.
   }
 });

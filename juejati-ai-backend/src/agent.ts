@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { generateText, tool, CoreMessage } from 'ai';
+import { generateText, tool, CoreMessage, embed } from 'ai';
 import { z } from 'zod';
 import { searchProperties } from './db.js';
 import { searchZonaPropScraper } from './scraper.js';
@@ -20,10 +20,13 @@ REGLAS DE BÚSQUEDA:
 4. Etiqueta al cliente y actualiza sus campos mediante 'update_ghl_contact' y 'add_ghl_tag' si obtienes nueva información (presupuesto, zona, etc).
 `;
 
-// Helper to generate a fake embedding for testing purposes (ideally use openai.embedding here)
-async function getEmbedding(text: string) {
-  // Mock! Must be implemented with actual text-embedding model in production
-  return new Array(1536).fill(0.01);
+// Genera un embedding real usando OpenAI text-embedding-3-small (1536 dims)
+async function getEmbedding(text: string): Promise<number[]> {
+  const { embedding } = await embed({
+    model: openai.embedding('text-embedding-3-small'),
+    value: text,
+  });
+  return embedding;
 }
 
 export async function runAgent(contactId: string, history: CoreMessage[], userMessage: string) {
