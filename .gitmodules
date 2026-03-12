@@ -1,0 +1,3 @@
+[submodule "zonaprop-scraper"]
+	path = zonaprop-scraper
+	url = https://github.com/Gochiri/zonaprop-scraper.git
