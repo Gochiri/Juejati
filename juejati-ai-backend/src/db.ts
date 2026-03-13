@@ -38,7 +38,7 @@ export async function searchProperties(embedding: number[], filters: PropertyFil
   } = filters;
 
   const sql = `
-    SELECT * FROM match_propiedades($1::vector, $2, $3, $4, $5, $6, $7, $8)
+    SELECT * FROM match_propiedades_v2($1::vector, $2, $3, $4, $5, $6, $7, $8)
   `;
 
   const params = [
@@ -89,7 +89,7 @@ export interface PropertyUpsert {
 
 export async function upsertProperty(data: PropertyUpsert) {
   const sql = `
-    INSERT INTO propiedades_vector (
+    INSERT INTO propiedades_v2 (
       tokko_id, codigo, titulo, descripcion, tipo, operacion,
       direccion, calle, altura, barrio, geo_lat, geo_long,
       precio, moneda, ambientes, dormitorios, banos, cocheras, superficie,
@@ -141,7 +141,7 @@ export async function upsertProperty(data: PropertyUpsert) {
 
 export async function markInactiveExcept(activeTokkoIds: number[]) {
   const sql = `
-    UPDATE propiedades_vector
+    UPDATE propiedades_v2
     SET activa = false
     WHERE tokko_id != ALL($1)
       AND activa = true

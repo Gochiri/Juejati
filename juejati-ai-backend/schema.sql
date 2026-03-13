@@ -1,17 +1,15 @@
 -- ============================================================
--- Schema: propiedades_vector (Supabase + pgvector)
--- Sync: Backend llama a Tokko API y escribe acá (reemplaza n8n)
+-- Schema: propiedades_v2 (Supabase + pgvector)
+-- Tabla nueva para el backend (no toca propiedades_vector de n8n)
+-- Sync: Backend llama a Tokko API y escribe acá
 -- Lectura: El agente Sofía hace búsqueda vectorial
 -- ============================================================
 
 -- Habilitar extensión pgvector (ya debería estar en Supabase)
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Dropear tabla vieja de n8n si existe (usaba estructura LangChain con content/metadata JSONB)
--- DROP TABLE IF EXISTS propiedades_vector;
-
 -- Tabla principal de propiedades
-CREATE TABLE IF NOT EXISTS propiedades_vector (
+CREATE TABLE IF NOT EXISTS propiedades_v2 (
   id            BIGSERIAL PRIMARY KEY,
   tokko_id      INTEGER UNIQUE NOT NULL,
   codigo        TEXT,
@@ -64,17 +62,17 @@ CREATE TABLE IF NOT EXISTS propiedades_vector (
 -- Índice vectorial para búsqueda semántica (cosine distance)
 -- NOTA: ivfflat necesita datos para crear el índice.
 -- Si la tabla está vacía, usar HNSW o crear el ivfflat después del primer sync.
-CREATE INDEX IF NOT EXISTS idx_propiedades_embedding
-  ON propiedades_vector
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_embedding
+  ON propiedades_v2
   USING hnsw (embedding vector_cosine_ops);
 
 -- Índices para filtros frecuentes
-CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades_vector (operacion);
-CREATE INDEX IF NOT EXISTS idx_propiedades_tipo ON propiedades_vector (tipo);
-CREATE INDEX IF NOT EXISTS idx_propiedades_barrio ON propiedades_vector (barrio);
-CREATE INDEX IF NOT EXISTS idx_propiedades_ambientes ON propiedades_vector (ambientes);
-CREATE INDEX IF NOT EXISTS idx_propiedades_precio ON propiedades_vector (precio);
-CREATE INDEX IF NOT EXISTS idx_propiedades_activa ON propiedades_vector (activa);
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_operacion ON propiedades_v2 (operacion);
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_tipo ON propiedades_v2 (tipo);
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_barrio ON propiedades_v2 (barrio);
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_ambientes ON propiedades_v2 (ambientes);
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_precio ON propiedades_v2 (precio);
+CREATE INDEX IF NOT EXISTS idx_propiedades_v2_activa ON propiedades_v2 (activa);
 
 -- Función para actualizar updated_at automáticamente
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -85,16 +83,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_propiedades_updated_at ON propiedades_vector;
+DROP TRIGGER IF EXISTS trg_propiedades_updated_at ON propiedades_v2;
 CREATE TRIGGER trg_propiedades_updated_at
-  BEFORE UPDATE ON propiedades_vector
+  BEFORE UPDATE ON propiedades_v2
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
 -- Función RPC para búsqueda vectorial desde el agente
 -- ============================================================
-CREATE OR REPLACE FUNCTION match_propiedades(
+CREATE OR REPLACE FUNCTION match_propiedades_v2(
   query_embedding vector(1536),
   match_threshold FLOAT DEFAULT 0.3,
   match_count INT DEFAULT 5,
@@ -151,7 +149,7 @@ BEGIN
     p.link_web,
     p.asesor,
     1 - (p.embedding <=> query_embedding) AS similarity
-  FROM propiedades_vector p
+  FROM propiedades_v2 p
   WHERE p.activa = true
     AND (filter_operacion IS NULL OR p.operacion ILIKE filter_operacion)
     AND (filter_tipo IS NULL OR p.tipo ILIKE '%' || filter_tipo || '%')
