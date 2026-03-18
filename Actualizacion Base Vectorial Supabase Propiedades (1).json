@@ -1,0 +1,315 @@
+{
+  "name": "Actualizacion Base Vectorial Supabase Propiedades",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        336,
+        928
+      ],
+      "id": "0b2a659d-eb8f-466c-889b-75174b7a5724",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "chunkSize": 600
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        1376
+      ],
+      "id": "68b80b59-fc8b-4a12-9de1-7938594a2d58",
+      "name": "Character Text Splitter1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// NODO: Generate Embedding - OPTIMIZADO PARA BÚSQUEDA SEMÁNTICA\n// ═══════════════════════════════════════════════════════\n\nconst property = $input.item.json;\n\nconsole.log('═══════════════════════════════════════');\nconsole.log('📝 Procesando propiedad:', property.tokkoId || property.id);\n\n// Extraer datos\nconst tokkoId = property.tokkoId || property.id || '';\nconst titulo = property.titulo || property.publication_title || '';\nconst tipoOperacion = property.operacion || property.tipo_operacion || '';\nconst precio = property.precio || null;\nconst moneda = property.moneda || 'USD';\nconst distrito = property.distrito || '';\nconst direccion = property.direccion || '';\nconst habitaciones = property.habitaciones || 0;\nconst banos = property.banos || 0;\nconst cocheras = property.cocheras || 0;\nconst superficie = property.areaConstruida || property.area_construida || 0;\nconst tipoInmueble = property.tipoInmueble || property.tipo_inmueble || '';\nconst asesor = property.asesor || '';\nconst imagen = property.imagen || '';\nconst linkWeb = property.linkWeb || property.link_web || '';\nconst descripcion = property.descripcion || property.description || '';\n\n// ═══════════════════════════════════════════════════════\n// EXTRAER CALLE Y ALTURA DE LA DIRECCIÓN\n// ═══════════════════════════════════════════════════════\nlet calle = '';\nlet altura = '';\n\nif (direccion) {\n  // Intentar separar calle y número\n  // Ej: \"Cabezas 2500\" → calle=\"Cabezas\", altura=\"2500\"\n  const dirMatch = direccion.match(/^(.+?)\\s+(\\d+)$/);\n  if (dirMatch) {\n    calle = dirMatch[1].trim();\n    altura = dirMatch[2];\n  } else {\n    calle = direccion.trim();\n  }\n}\n\nconsole.log('✅ Datos extraídos:', {\n  tokkoId,\n  titulo: titulo.substring(0, 30),\n  direccion,\n  calle,\n  altura,\n  distrito\n});\n\n// ═══════════════════════════════════════════════════════\n// METADATA ESTRUCTURADA (para filtros)\n// ═══════════════════════════════════════════════════════\nconst metadata = {\n  tokko_id: tokkoId.toString(),\n  codigo: property.codigo || '',\n  titulo: titulo,\n  direccion: direccion,\n  calle: calle,  // 🆕 Campo nuevo\n  altura: altura, // 🆕 Campo nuevo\n  distrito: distrito,\n  zona: distrito, // Alias para búsquedas\n  barrio: distrito, // Alias para búsquedas\n  precio: precio,\n  moneda: moneda,\n  ambientes: habitaciones, // En Argentina: ambientes\n  dormitorios: habitaciones > 0 ? habitaciones - 1 : 0, // dormitorios = ambientes - 1\n  habitaciones: habitaciones,\n  banos: banos,\n  cocheras: cocheras,\n  area_construida: superficie,\n  tipo_inmueble: tipoInmueble,\n  tipo_propiedad: tipoInmueble, // Alias\n  tipo_operacion: tipoOperacion,\n  operacion: tipoOperacion.toLowerCase(), // \"venta\" o \"alquiler\"\n  asesor: asesor,\n  imagen: imagen,\n  link_web: linkWeb,\n  geo_lat: property.geoLat?.toString() || '',\n  geo_long: property.geoLong?.toString() || ''\n};\n\n// ═══════════════════════════════════════════════════════\n// TEXTO PARA EMBEDDING (lenguaje natural)\n// ═══════════════════════════════════════════════════════\n\n// Construir descripción de precio\nlet textoPrecio = '';\nif (precio) {\n  const precioFormateado = precio.toLocaleString('es-AR');\n  textoPrecio = `${moneda} ${precioFormateado}`;\n} else {\n  textoPrecio = 'Precio a consultar';\n}\n\n// Construir descripción de ambientes/dormitorios\nlet textoAmbientes = '';\nif (habitaciones > 0) {\n  const dormitorios = habitaciones - 1;\n  if (habitaciones === 1) {\n    textoAmbientes = 'monoambiente';\n  } else if (dormitorios === 1) {\n    textoAmbientes = `${habitaciones} ambientes (${dormitorios} dormitorio)`;\n  } else {\n    textoAmbientes = `${habitaciones} ambientes (${dormitorios} dormitorios)`;\n  }\n}\n\n// Construir descripción de ubicación\nlet textoUbicacion = '';\nif (direccion && distrito) {\n  textoUbicacion = `en ${direccion}, ${distrito}`;\n} else if (direccion) {\n  textoUbicacion = `en ${direccion}`;\n} else if (distrito) {\n  textoUbicacion = `en ${distrito}`;\n}\n\n// Construir características adicionales\nconst caracteristicas = [];\nif (banos > 0) caracteristicas.push(`${banos} baño${banos > 1 ? 's' : ''}`);\nif (cocheras > 0) caracteristicas.push(`${cocheras} cochera${cocheras > 1 ? 's' : ''}`);\nif (superficie > 0) caracteristicas.push(`${superficie}m²`);\n\nconst textoCaracteristicas = caracteristicas.length > 0 \n  ? caracteristicas.join(', ') + '.'\n  : '';\n\n// Limpiar descripción (primeros 300 caracteres)\nconst textoDescripcion = descripcion \n  ? descripcion.substring(0, 300).trim() + '...'\n  : '';\n\n// ═══════════════════════════════════════════════════════\n// TEXTO COMPLETO EN LENGUAJE NATURAL\n// ═══════════════════════════════════════════════════════\nconst textoCompleto = `\n${tipoInmueble} ${textoAmbientes} ${textoUbicacion}.\n${tipoOperacion} ${textoPrecio}.\n${textoCaracteristicas}\n${titulo}\n${textoDescripcion}\n`.trim().replace(/\\s+/g, ' ');\n\nconsole.log('📦 Texto generado:', textoCompleto.substring(0, 150) + '...');\nconsole.log('═══════════════════════════════════════');\n\n// Retornar\nreturn {\n  json: {\n    text: textoCompleto,\n    metadata: metadata\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        928
+      ],
+      "id": "8dffd930-2af1-4544-8302-57c99d1a01ea",
+      "name": "Generate Embedding"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "propiedades_vector"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        1712,
+        928
+      ],
+      "id": "cfc4294a-ba44-401a-9e77-876b04fab457",
+      "name": "Supabase Vector Store",
+      "notesInFlow": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "bk4locPgOPTFFISB",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1568,
+        1248
+      ],
+      "id": "638e7d1a-a577-41af-bd05-89bacee51ccd",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "NIG7Ypuh5LuKtomK",
+          "name": "OpenAi Juejati"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Generate Embedding').item.json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "metadata",
+                "value": "={{ $('Generate Embedding').item.json.metadata }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        1184
+      ],
+      "id": "d858444b-9d6a-4911-bae0-16f823b538a0",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "url": "http://www.tokkobroker.com/api/v1/property",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "aca3b014e5c3eb0dcc7c6e8ab7e16864041435cf"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            },
+            {
+              "name": "lang",
+              "value": "es_ar"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "91563fc1-2c9c-4ab6-bc59-8425151476ad",
+      "name": "Tokko API Request1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer y preparar cada propiedad individualmente\nconst data = $input.first().json;\nconst properties = data.objects || [];\n\nconsole.log(`=== TOKKO PROPERTIES PROCESSING ===`);\nconsole.log(`Total properties found: ${properties.length}`);\n\n// Crear un item por cada propiedad\nconst items = [];\n\nproperties.forEach((property, index) => {\n  // Función helper para obtener precio por tipo de operación\n  const getPriceByOperation = (operations, operationType, currency) => {\n    const operation = operations?.find(op => op.operation_type === operationType);\n    const price = operation?.prices?.find(p => p.currency === currency);\n    return price?.price || null;\n  };\n\n  // Función helper para obtener moneda por tipo de operación\n  const getCurrencyByOperation = (operations, operationType) => {\n    const operation = operations?.find(op => op.operation_type === operationType);\n    return operation?.prices?.[0]?.currency || 'USD';\n  };\n\n  // Función helper para obtener operaciones\n  const getOperations = (operations) => {\n    return operations?.map(op => op.operation_type).join(', ') || '';\n  };\n\n  // ═══════════════════════════════════════════════════════\n  // FUNCIÓN PARA EXTRAER PRIMERA IMAGEN\n  // ═══════════════════════════════════════════════════════\n  const getPrimeraImagen = (photos) => {\n    if (!photos || photos.length === 0) {\n      return '';  // Retorna string vacío si no hay fotos\n    }\n\n    // Ordenar fotos por el campo 'order'\n    const sortedPhotos = [...photos].sort((a, b) => (a.order || 0) - (b.order || 0));\n    \n    // Buscar imagen de portada (is_front_cover: true)\n    const coverPhoto = sortedPhotos.find(p => p.is_front_cover === true);\n    \n    // Primera imagen (por orden o la de portada)\n    const firstPhoto = coverPhoto || sortedPhotos[0];\n\n    // Retornar la URL de la imagen\n    return firstPhoto?.image || '';\n  };\n\n  const transformedProperty = {\n    // Datos originales de Tokko\n    tokkoId: property.id?.toString() || '',\n    codigo: property.reference_code || '',\n    tipoInmueble: property.type?.name || '',\n    operacion: getOperations(property.operations),\n    titulo: property.publication_title || '',\n    direccion: property.real_address || '',\n    linkWeb: property.public_url || '',\n    descripcion: property.description || '',\n    distrito: property.location?.name || '',\n    propietarioNombre: property.internal_data?.property_owners?.[0]?.name || '',\n    propietarioCelular: property.internal_data?.property_owners?.[0]?.phone || '',\n    moneda: property.operations?.[0]?.operation_type === \"Alquiler\" ? \n      getCurrencyByOperation(property.operations, \"Alquiler\") : \n      getCurrencyByOperation(property.operations, \"Venta\"),\n    precio: property.operations?.[0]?.operation_type === \"Alquiler\" ? \n      getPriceByOperation(property.operations, \"Alquiler\", \"ARS\") : \n      getPriceByOperation(property.operations, \"Venta\", \"USD\"),\n    asesor: property.producer?.name || '',\n    areaConstruida: parseFloat(property.surface) || null,\n    habitaciones: property.room_amount || (property.bedroom_amount ? property.bedroom_amount + 1 : null),\n    banos: property.bathroom_amount || null,\n    cocheras: property.parking_lot_amount || null,\n    geoLat: parseFloat(property.geo_lat) || null,\n    geoLong: parseFloat(property.geo_long) || null,\n    \n    // ═══════════════════════════════════════════════════════\n    // IMAGEN PRINCIPAL (NUEVO)\n    // ═══════════════════════════════════════════════════════\n    imagen: getPrimeraImagen(property.photos),\n    \n    // Metadatos para tracking\n    propertyIndex: index + 1,\n    totalProperties: properties.length,\n    processedAt: new Date().toISOString()\n  };\n\n  items.push({ json: transformedProperty });\n});\n\nconsole.log(`Prepared ${items.length} properties for processing`);\nconsole.log(`Properties with images: ${items.filter(i => i.json.imagen).length}`);\n\nreturn items;"
+      },
+      "id": "290716d2-c153-4b85-9a8e-382c8cd40b2a",
+      "name": "Split Properties to Individual Items1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1088,
+        928
+      ],
+      "id": "251f6275-07cd-461f-a139-a83693520a7b",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me1",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        1360
+      ],
+      "id": "efc8a8b8-f5ea-420c-a287-14b7f752cd89"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Tokko API Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Text Splitter1": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Replace Me1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tokko API Request1": {
+      "main": [
+        [
+          {
+            "node": "Split Properties to Individual Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Properties to Individual Items1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Generate Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "9daddce7-8510-4d67-ba21-48219f29c3b9",
+  "meta": {
+    "instanceId": "5b2372f2635dd70951ede88a3062b4f50e8510b33f9ee8dc8789ff1da1d702e4"
+  },
+  "id": "IrISwW8QXW4vtD-hXp9ET",
+  "tags": []
+}
