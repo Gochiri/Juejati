@@ -13,12 +13,13 @@ services:
       - TOKKO_API_KEY=${TOKKO_API_KEY}
       - SCRAPER_API_URL=http://zonaprop-scraper:3000/api/search
     networks:
-      - internal_swarm_network # Replace with your actual swarm network
+      - korvancenet
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
 
 networks:
-  internal_swarm_network:
-    external: true # Assumes you have a shared network between your postgres, scraper, and this container
+  korvancenet:
+    external: true
+    name: korvancenet
