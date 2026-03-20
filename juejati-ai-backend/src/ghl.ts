@@ -28,7 +28,9 @@ export async function getConversationHistory(contactId: string, limit = 20) {
     throw new Error(`GHL Error fetching messages: ${msgRes.status} ${msgRes.statusText} - ${body}`);
   }
   const msgData = await msgRes.json();
-  return msgData.messages || [];
+  // GHL returns { messages: { messages: [...] } } or { messages: [...] }
+  const msgs = msgData.messages;
+  return Array.isArray(msgs) ? msgs : (msgs?.messages || []);
 }
 
 async function getOrCreateConversationId(contactId: string): Promise<string> {
