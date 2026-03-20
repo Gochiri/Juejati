@@ -48,6 +48,7 @@ app.post('/webhook/ghl', async (req, res) => {
     // 2. Run Agent
     console.log(`🤖 Running agent for ${contactId}...`);
     const { text: agentResponse, images } = await runAgent(contactId, history, messageBody);
+    console.log(`🖼️ Images extracted: ${images.length} - ${JSON.stringify(images)}`);
 
     // 3. Send Response back to GHL
     await sendMessage(contactId, agentResponse, channel, phone, images);
