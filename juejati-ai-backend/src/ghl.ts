@@ -33,12 +33,16 @@ export async function getConversationHistory(contactId: string, limit = 20) {
   return Array.isArray(msgs) ? msgs : (msgs?.messages || []);
 }
 
-// Maps GHL numeric message type to send API string type
-const GHL_TYPE_MAP: Record<number, string> = {
-  1: 'SMS',
-  3: 'Email',
-  6: 'WhatsApp',
-  20: 'SMS', // Custom/internal — default to SMS
+// Maps GHL conversation channel to send API message type
+const GHL_CHANNEL_MAP: Record<string, string> = {
+  'TYPE_PHONE': 'SMS',
+  'TYPE_WHATSAPP': 'WhatsApp',
+  'TYPE_EMAIL': 'Email',
+  'TYPE_FB_MESSENGER': 'Facebook',
+  'TYPE_GMB': 'GMB',
+  'SMS': 'SMS',
+  'WhatsApp': 'WhatsApp',
+  'Email': 'Email',
 };
 
 async function getOrCreateConversation(contactId: string): Promise<{ id: string; channel: string }> {
@@ -64,9 +68,7 @@ async function getOrCreateConversation(contactId: string): Promise<{ id: string;
 
 export async function sendMessage(contactId: string, message: string, incomingType: string = 'WhatsApp') {
   const { id: conversationId, channel } = await getOrCreateConversation(contactId);
-  // Use conversation channel; if it's a numeric string, map it
-  const numType = parseInt(incomingType);
-  const type = isNaN(numType) ? incomingType : (GHL_TYPE_MAP[numType] || 'SMS');
+  const type = GHL_CHANNEL_MAP[channel] || 'SMS';
   console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} type=${type}`);
 
   const url = `${GHL_API_BASE}/conversations/messages`;
