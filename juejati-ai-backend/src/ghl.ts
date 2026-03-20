@@ -10,14 +10,25 @@ const headers = {
 };
 
 export async function getConversationHistory(contactId: string, limit = 20) {
-  const url = `${GHL_API_BASE}/conversations/messages?contactId=${contactId}&limit=${limit}&sortOrder=desc`;
-  const res = await fetch(url, { method: 'GET', headers });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`GHL Error fetching history: ${res.status} ${res.statusText} - ${body}`);
+  // Step 1: find the conversation for this contact
+  const searchRes = await fetch(`${GHL_API_BASE}/conversations/search?contactId=${contactId}&limit=1`, { method: 'GET', headers });
+  if (!searchRes.ok) {
+    const body = await searchRes.text();
+    throw new Error(`GHL Error searching conversation: ${searchRes.status} ${searchRes.statusText} - ${body}`);
   }
-  const data = await res.json();
-  return data.messages || [];
+  const searchData = await searchRes.json();
+  const conversations = searchData.conversations || [];
+  if (conversations.length === 0) return [];
+
+  // Step 2: get messages from that conversation
+  const conversationId = conversations[0].id;
+  const msgRes = await fetch(`${GHL_API_BASE}/conversations/${conversationId}/messages?limit=${limit}`, { method: 'GET', headers });
+  if (!msgRes.ok) {
+    const body = await msgRes.text();
+    throw new Error(`GHL Error fetching messages: ${msgRes.status} ${msgRes.statusText} - ${body}`);
+  }
+  const msgData = await msgRes.json();
+  return msgData.messages || [];
 }
 
 async function getOrCreateConversationId(contactId: string): Promise<string> {
