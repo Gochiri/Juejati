@@ -79,6 +79,9 @@ Si el cliente quiere ver una propiedad:
 3. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés.
 `;
 
+// Cache last search images per contact
+const lastImagesCache = new Map<string, string[]>();
+
 async function getEmbedding(text: string): Promise<number[]> {
   const { embedding } = await embed({
     model: openai.embedding('text-embedding-3-small'),
@@ -120,8 +123,10 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
             barrio: args.zona,
             presupuesto_max: args.presupuesto_max,
           });
-          // Collect image URLs for attachments
-          results.forEach((r: any) => { if (r.imagen) collectedImages.push(r.imagen); });
+          // Collect image URLs for attachments and cache them
+          const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen);
+          collectedImages.push(...imgs);
+          lastImagesCache.set(contactId, imgs);
           return results;
         }
       }),
@@ -184,5 +189,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     }
   });
 
-  return { text: result.text, images: collectedImages };
+  // If no new search happened, use cached images from last search
+  const images = collectedImages.length > 0 ? collectedImages : (lastImagesCache.get(contactId) || []);
+  return { text: result.text, images };
 }
