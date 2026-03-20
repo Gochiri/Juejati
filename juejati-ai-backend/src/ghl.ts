@@ -2,8 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
+const ghlApiKey = (process.env.GHL_API_KEY || '').replace(/^Bearer\s+/i, '');
 const headers = {
-  'Authorization': `Bearer ${process.env.GHL_API_KEY}`,
+  'Authorization': `Bearer ${ghlApiKey}`,
   'Version': '2021-07-28',
   'Content-Type': 'application/json',
 };
