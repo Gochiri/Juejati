@@ -68,7 +68,10 @@ export async function sendMessage(contactId: string, message: string, type: stri
       message,
     }),
   });
-  if (!res.ok) throw new Error(`GHL Error sending message: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GHL Error sending message: ${res.status} ${res.statusText} - ${body}`);
+  }
   return res.json();
 }
 
