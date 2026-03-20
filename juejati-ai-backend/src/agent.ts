@@ -1,7 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { generateText, tool, CoreMessage, embed } from 'ai';
 import { z } from 'zod';
-import { searchProperties } from './db.js';
+import { searchProperties, saveContactImages, getContactImages } from './db.js';
 import { searchZonaPropScraper } from './scraper.js';
 import { addContactTag, updateContactFields } from './ghl.js';
 
@@ -80,9 +80,6 @@ Si el cliente quiere ver una propiedad:
 3. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés.
 `;
 
-// Cache last search images per contact
-const lastImagesCache = new Map<string, string[]>();
-
 async function getEmbedding(text: string): Promise<number[]> {
   const { embedding } = await embed({
     model: openai.embedding('text-embedding-3-small'),
@@ -124,11 +121,13 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
             barrio: args.zona,
             presupuesto_max: args.presupuesto_max,
           });
-          // Collect image URLs for attachments and cache them
-          const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen);
-          console.log(`🔍 Tool results: ${results.length} properties, ${imgs.length} images`);
+          // Collect image URLs for attachments (max 3 to avoid spam)
+          const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen).slice(0, 3);
+          console.log(`🔍 Tool results: ${results.length} properties, ${imgs.length} images: ${JSON.stringify(imgs)}`);
           collectedImages.push(...imgs);
-          lastImagesCache.set(contactId, imgs);
+          if (imgs.length > 0) {
+            await saveContactImages(contactId, imgs);
+          }
           return results;
         }
       }),
@@ -141,17 +140,21 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           operacion: z.string().optional()
         }),
         execute: async (args) => {
-          const results = await searchZonaPropScraper({
+          const raw = await searchZonaPropScraper({
             barrio: args.zona,
             tipo: args.tipo,
             operacion: args.operacion
           });
-          // Collect images and use rebrandedUrl instead of raw zonaprop link
-          const imgs = results.filter((r: any) => r.image).map((r: any) => r.image);
+          // Scraper returns { properties: [...], html: '...' } or an array
+          const properties: any[] = Array.isArray(raw) ? raw : (raw?.properties || []);
+          // Collect images and use rebrandedUrl instead of raw zonaprop link (max 3)
+          const imgs = properties.filter((r: any) => r.image).map((r: any) => r.image).slice(0, 3);
           collectedImages.push(...imgs);
-          lastImagesCache.set(contactId, imgs);
+          if (imgs.length > 0) {
+            await saveContactImages(contactId, imgs);
+          }
           // Map to cleaner format so agent never sees the raw zonaprop link
-          return results.map((r: any) => ({
+          return properties.map((r: any) => ({
             titulo: r.title,
             precio: r.price,
             ubicacion: r.location,
@@ -212,9 +215,13 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
   // Strip inline image markdown from text
   const cleanText = result.text.replace(/!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '').trim();
 
-  // If no new images, use cached images from last search
-  const images = collectedImages.length > 0 ? collectedImages : (lastImagesCache.get(contactId) || []);
-  if (collectedImages.length > 0) lastImagesCache.set(contactId, collectedImages);
+  // If no new images from this turn, fall back to DB-persisted images from last search
+  let images = collectedImages;
+  if (images.length === 0) {
+    images = await getContactImages(contactId);
+    console.log(`📦 Using cached images for ${contactId}: ${images.length}`);
+  }
+  console.log(`📤 Returning ${images.length} images for ${contactId}`);
 
   return { text: cleanText, images };
 }

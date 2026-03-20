@@ -50,8 +50,18 @@ app.post('/webhook/ghl', async (req, res) => {
     const { text: agentResponse, images } = await runAgent(contactId, history, messageBody);
     console.log(`🖼️ Images extracted: ${images.length} - ${JSON.stringify(images)}`);
 
-    // 3. Send Response back to GHL
-    await sendMessage(contactId, agentResponse, channel, phone, images);
+    // 3. Send text response to GHL
+    await sendMessage(contactId, agentResponse, channel, phone);
+
+    // 4. Send images as separate attachment-only messages (more reliable for WhatsApp)
+    for (const imageUrl of images) {
+      try {
+        await sendMessage(contactId, '', channel, phone, [imageUrl]);
+        console.log(`🖼️ Sent image: ${imageUrl}`);
+      } catch (imgErr) {
+        console.error(`❌ Failed to send image ${imageUrl}:`, imgErr);
+      }
+    }
 
     console.log(`✅ Successfully replied to ${contactId} via ${channel}`);
   } catch (err) {
