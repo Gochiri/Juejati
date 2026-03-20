@@ -33,18 +33,25 @@ export async function getConversationHistory(contactId: string, limit = 20) {
   return Array.isArray(msgs) ? msgs : (msgs?.messages || []);
 }
 
-async function getOrCreateConversationId(contactId: string): Promise<string> {
-  // Search for existing conversation for this contact
+// Maps GHL numeric message type to send API string type
+const GHL_TYPE_MAP: Record<number, string> = {
+  1: 'SMS',
+  3: 'Email',
+  6: 'WhatsApp',
+  20: 'SMS', // Custom/internal — default to SMS
+};
+
+async function getOrCreateConversation(contactId: string): Promise<{ id: string; channel: string }> {
   const searchUrl = `${GHL_API_BASE}/conversations/search?contactId=${contactId}&limit=1`;
   const res = await fetch(searchUrl, { method: 'GET', headers });
   if (!res.ok) throw new Error(`GHL Error searching conversations: ${res.statusText}`);
   const data = await res.json();
 
   if (data.conversations && data.conversations.length > 0) {
-    return data.conversations[0].id;
+    const conv = data.conversations[0];
+    return { id: conv.id, channel: conv.channel || conv.type || 'SMS' };
   }
 
-  // If no conversation exists, create one
   const createRes = await fetch(`${GHL_API_BASE}/conversations`, {
     method: 'POST',
     headers,
@@ -52,11 +59,15 @@ async function getOrCreateConversationId(contactId: string): Promise<string> {
   });
   if (!createRes.ok) throw new Error(`GHL Error creating conversation: ${createRes.statusText}`);
   const created = await createRes.json();
-  return created.conversation.id;
+  return { id: created.conversation.id, channel: created.conversation.channel || 'SMS' };
 }
 
-export async function sendMessage(contactId: string, message: string, type: string = 'WhatsApp') {
-  const conversationId = await getOrCreateConversationId(contactId);
+export async function sendMessage(contactId: string, message: string, incomingType: string = 'WhatsApp') {
+  const { id: conversationId, channel } = await getOrCreateConversation(contactId);
+  // Use conversation channel; if it's a numeric string, map it
+  const numType = parseInt(incomingType);
+  const type = isNaN(numType) ? incomingType : (GHL_TYPE_MAP[numType] || 'SMS');
+  console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} type=${type}`);
 
   const url = `${GHL_API_BASE}/conversations/messages`;
   const res = await fetch(url, {
