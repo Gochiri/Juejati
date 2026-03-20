@@ -126,6 +126,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           });
           // Collect image URLs for attachments and cache them
           const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen);
+          console.log(`🔍 Tool results: ${results.length} properties, ${imgs.length} images`);
           collectedImages.push(...imgs);
           lastImagesCache.set(contactId, imgs);
           return results;
