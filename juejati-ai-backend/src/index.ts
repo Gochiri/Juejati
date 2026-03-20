@@ -22,14 +22,15 @@ app.post('/webhook/ghl', async (req, res) => {
     // GHL sends type, contact_id, message, etc.
     const contactId = payload.contact_id;
     const messageBody = payload.body || payload.message?.body;
-    const channel = payload.type || payload.channel || 'WhatsApp';
+    // Use numeric type from message object (20=WhatsApp, 1=SMS)
+    const msgNumType = payload.message?.type;
+    const channel = String(msgNumType ?? payload.type ?? payload.channel ?? 'WhatsApp');
 
     if (!contactId || !messageBody) {
       return res.status(400).send('Missing contact_id or message body');
     }
 
     console.log(`📩 [${channel}] Message from ${contactId}: ${messageBody}`);
-    console.log(`📦 message object: ${JSON.stringify(payload.message)}`);
 
     // Acknowledge webhook quickly to avoid GHL retries
     res.status(200).send({ success: true });

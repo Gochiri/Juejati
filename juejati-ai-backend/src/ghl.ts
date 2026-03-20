@@ -35,11 +35,14 @@ export async function getConversationHistory(contactId: string, limit = 20) {
 
 // Maps GHL conversation channel to send API message type
 const GHL_CHANNEL_MAP: Record<string, string> = {
+  // Numeric types from message payload
+  '1': 'SMS',
+  '3': 'Email',
+  '20': 'WhatsApp',
+  // Conversation channel strings
   'TYPE_PHONE': 'SMS',
   'TYPE_WHATSAPP': 'WhatsApp',
   'TYPE_EMAIL': 'Email',
-  'TYPE_FB_MESSENGER': 'Facebook',
-  'TYPE_GMB': 'GMB',
   'SMS': 'SMS',
   'WhatsApp': 'WhatsApp',
   'Email': 'Email',
@@ -68,8 +71,8 @@ async function getOrCreateConversation(contactId: string): Promise<{ id: string;
 
 export async function sendMessage(contactId: string, message: string, incomingType: string = 'WhatsApp') {
   const { id: conversationId, channel } = await getOrCreateConversation(contactId);
-  const type = GHL_CHANNEL_MAP[channel] || 'SMS';
-  console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} type=${type}`);
+  const type = GHL_CHANNEL_MAP[incomingType] || GHL_CHANNEL_MAP[channel] || 'SMS';
+  console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} incomingType=${incomingType} type=${type}`);
 
   const url = `${GHL_API_BASE}/conversations/messages`;
   const res = await fetch(url, {
