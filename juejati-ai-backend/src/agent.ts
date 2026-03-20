@@ -59,10 +59,10 @@ Cuando tengas zona, tipo, ambientes, presupuesto y operación:
 Encontré estas opciones en [zona]:
 
 1) **[Título]**
-   💰 USD [precio]
+   💰 [precio]
    📍 [dirección/barrio]
    🏠 [ambientes] amb · [superficie] m²
-   🔗 [link_web o ficha_tokko]
+   🔗 [link_web]
 
 SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
 
@@ -140,11 +140,23 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           operacion: z.string().optional()
         }),
         execute: async (args) => {
-          return await searchZonaPropScraper({
+          const results = await searchZonaPropScraper({
             barrio: args.zona,
             tipo: args.tipo,
             operacion: args.operacion
           });
+          // Collect images and use rebrandedUrl instead of raw zonaprop link
+          const imgs = results.filter((r: any) => r.image).map((r: any) => r.image);
+          collectedImages.push(...imgs);
+          lastImagesCache.set(contactId, imgs);
+          // Map to cleaner format so agent never sees the raw zonaprop link
+          return results.map((r: any) => ({
+            titulo: r.title,
+            precio: r.price,
+            ubicacion: r.location,
+            caracteristicas: r.features,
+            link_web: r.rebrandedUrl || '',
+          }));
         }
       }),
 
