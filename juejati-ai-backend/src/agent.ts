@@ -62,7 +62,6 @@ Encontré estas opciones en [zona]:
    📍 [dirección/barrio]
    🏠 [ambientes] amb · [superficie] m²
    🔗 [link_web o ficha_tokko]
-   [IMAGEN:url_imagen]
 
 SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
 
@@ -88,11 +87,13 @@ async function getEmbedding(text: string): Promise<number[]> {
   return embedding;
 }
 
-export async function runAgent(contactId: string, history: CoreMessage[], userMessage: string) {
+export async function runAgent(contactId: string, history: CoreMessage[], userMessage: string): Promise<{ text: string; images: string[] }> {
   const messages: CoreMessage[] = [
     ...history,
     { role: 'user', content: userMessage }
   ];
+
+  const collectedImages: string[] = [];
 
   const result = await generateText({
     model: openai('gpt-4o-mini'),
@@ -119,6 +120,8 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
             barrio: args.zona,
             presupuesto_max: args.presupuesto_max,
           });
+          // Collect image URLs for attachments
+          results.forEach((r: any) => { if (r.imagen) collectedImages.push(r.imagen); });
           return results;
         }
       }),
@@ -181,14 +184,5 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     }
   });
 
-  // Extract image URLs tagged as [IMAGEN:url] and strip them from the text
-  const imageRegex = /\[IMAGEN:(https?:\/\/[^\]]+)\]/g;
-  const images: string[] = [];
-  let match;
-  while ((match = imageRegex.exec(result.text)) !== null) {
-    images.push(match[1]);
-  }
-  const text = result.text.replace(/\[IMAGEN:https?:\/\/[^\]]+\]\n?/g, '').trim();
-
-  return { text, images };
+  return { text: result.text, images: collectedImages };
 }
