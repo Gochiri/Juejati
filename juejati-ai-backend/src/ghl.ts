@@ -69,21 +69,27 @@ async function getOrCreateConversation(contactId: string): Promise<{ id: string;
   return { id: created.conversation.id, channel: created.conversation.channel || 'SMS' };
 }
 
-export async function sendMessage(contactId: string, message: string, incomingType: string = 'WhatsApp') {
+export async function sendMessage(contactId: string, message: string, incomingType: string = 'WhatsApp', toNumber: string = '', attachments: string[] = []) {
   const { id: conversationId, channel } = await getOrCreateConversation(contactId);
   const type = GHL_CHANNEL_MAP[channel] || 'SMS';
   console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} type=${type}`);
+
+  const payload: Record<string, any> = {
+    type,
+    conversationId,
+    contactId,
+    message,
+    locationId: process.env.GHL_LOCATION_ID,
+    fromNumber: process.env.GHL_FROM_NUMBER,
+  };
+  if (toNumber) payload.toNumber = toNumber;
+  if (attachments.length > 0) payload.attachments = attachments;
 
   const url = `${GHL_API_BASE}/conversations/messages`;
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      type,
-      conversationId,
-      contactId,
-      message,
-    }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const body = await res.text();

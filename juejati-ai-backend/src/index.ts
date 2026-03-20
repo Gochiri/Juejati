@@ -21,6 +21,7 @@ app.post('/webhook/ghl', async (req, res) => {
     
     // GHL sends type, contact_id, message, etc.
     const contactId = payload.contact_id;
+    const phone = payload.phone || '';
     const messageBody = payload.body || payload.message?.body;
     // Use numeric type from message object (20=WhatsApp, 1=SMS)
     const msgNumType = payload.message?.type;
@@ -49,7 +50,7 @@ app.post('/webhook/ghl', async (req, res) => {
     const agentResponse = await runAgent(contactId, history, messageBody);
 
     // 3. Send Response back to GHL
-    await sendMessage(contactId, agentResponse, channel);
+    await sendMessage(contactId, agentResponse, channel, phone);
 
     console.log(`✅ Successfully replied to ${contactId} via ${channel}`);
   } catch (err) {
