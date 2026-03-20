@@ -29,6 +29,7 @@ app.post('/webhook/ghl', async (req, res) => {
     }
 
     console.log(`📩 [${channel}] Message from ${contactId}: ${messageBody}`);
+    console.log(`📦 Payload keys: ${JSON.stringify(Object.keys(payload))} | type=${payload.type} | messageType=${payload.messageType} | channel=${payload.channel}`);
 
     // Acknowledge webhook quickly to avoid GHL retries
     res.status(200).send({ success: true });
