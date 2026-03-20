@@ -18,6 +18,14 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.juejati-agent.rule=Host(`agent.korvance.com`)"
+        - "traefik.http.routers.juejati-agent.entrypoints=websecure"
+        - "traefik.http.routers.juejati-agent.tls=true"
+        - "traefik.http.routers.juejati-agent.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.juejati-agent.loadbalancer.server.port=4000"
+        - "traefik.docker.network=korvancenet"
 
 networks:
   korvancenet:
