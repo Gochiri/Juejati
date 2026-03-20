@@ -190,7 +190,18 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     }
   });
 
-  // If no new search happened, use cached images from last search
+  // Extract image URLs from markdown patterns in text: ![Foto](url) or ![Imagen](url)
+  const inlineImageRegex = /!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\((https?:\/\/[^)]+)\)/g;
+  let match;
+  while ((match = inlineImageRegex.exec(result.text)) !== null) {
+    if (!collectedImages.includes(match[1])) collectedImages.push(match[1]);
+  }
+  // Strip inline image markdown from text
+  const cleanText = result.text.replace(/!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '').trim();
+
+  // If no new images, use cached images from last search
   const images = collectedImages.length > 0 ? collectedImages : (lastImagesCache.get(contactId) || []);
-  return { text: result.text, images };
+  if (collectedImages.length > 0) lastImagesCache.set(contactId, collectedImages);
+
+  return { text: cleanText, images };
 }
