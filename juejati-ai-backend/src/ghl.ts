@@ -12,7 +12,10 @@ const headers = {
 export async function getConversationHistory(contactId: string, limit = 20) {
   const url = `${GHL_API_BASE}/conversations/messages?contactId=${contactId}&limit=${limit}&sortOrder=desc`;
   const res = await fetch(url, { method: 'GET', headers });
-  if (!res.ok) throw new Error(`GHL Error fetching history: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GHL Error fetching history: ${res.status} ${res.statusText} - ${body}`);
+  }
   const data = await res.json();
   return data.messages || [];
 }
