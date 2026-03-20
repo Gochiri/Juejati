@@ -63,8 +63,9 @@ export async function sendMessage(contactId: string, message: string, type: stri
     method: 'POST',
     headers,
     body: JSON.stringify({
-      type, // Adjust based on source channel if needed
+      type,
       conversationId,
+      contactId,
       message,
     }),
   });
