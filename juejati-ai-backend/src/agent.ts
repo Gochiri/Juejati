@@ -62,6 +62,7 @@ Encontré estas opciones en [zona]:
    📍 [dirección/barrio]
    🏠 [ambientes] amb · [superficie] m²
    🔗 [link_web o ficha_tokko]
+   [IMAGEN:url_imagen]
 
 SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
 
@@ -180,5 +181,14 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     }
   });
 
-  return result.text;
+  // Extract image URLs tagged as [IMAGEN:url] and strip them from the text
+  const imageRegex = /\[IMAGEN:(https?:\/\/[^\]]+)\]/g;
+  const images: string[] = [];
+  let match;
+  while ((match = imageRegex.exec(result.text)) !== null) {
+    images.push(match[1]);
+  }
+  const text = result.text.replace(/\[IMAGEN:https?:\/\/[^\]]+\]\n?/g, '').trim();
+
+  return { text, images };
 }

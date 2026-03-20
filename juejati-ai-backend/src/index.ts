@@ -47,10 +47,10 @@ app.post('/webhook/ghl', async (req, res) => {
 
     // 2. Run Agent
     console.log(`🤖 Running agent for ${contactId}...`);
-    const agentResponse = await runAgent(contactId, history, messageBody);
+    const { text: agentResponse, images } = await runAgent(contactId, history, messageBody);
 
     // 3. Send Response back to GHL
-    await sendMessage(contactId, agentResponse, channel, phone);
+    await sendMessage(contactId, agentResponse, channel, phone, images);
 
     console.log(`✅ Successfully replied to ${contactId} via ${channel}`);
   } catch (err) {
