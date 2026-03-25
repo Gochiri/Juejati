@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { runAgent } from './agent.js';
+import { runAgent, handleStaleOpportunity } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
 import { CoreMessage } from 'ai';
@@ -67,6 +67,45 @@ app.post('/webhook/ghl', async (req, res) => {
   } catch (err) {
     console.error('❌ Error handling webhook:', err);
     // If we hadn't already sent a response, we would do it here.
+  }
+});
+
+// Endpoint to handle Follow-Up for stale opportunities
+app.post('/api/followup', async (req, res) => {
+  try {
+    const payload = req.body;
+    const contactId = payload.contact_id;
+    const phone = payload.phone || '';
+    const channel = payload.channel || 'WhatsApp'; // Default if not provided
+
+    if (!contactId) {
+      return res.status(400).send({ error: 'Missing contact_id' });
+    }
+
+    console.log(`⏳ Handling stale opportunity for contact ${contactId} via ${channel}`);
+
+    // Acknowledge quickly to GHL Workflow
+    res.status(200).send({ success: true, message: 'Follow-up process started' });
+
+    // 1. Fetch History
+    const rawHistory = await getConversationHistory(contactId, 10);
+    
+    // Convert GHL history to Vercel AI SDK format
+    const history: CoreMessage[] = rawHistory.reverse().map((msg: any) => ({
+      role: msg.direction === 'inbound' ? 'user' : 'assistant',
+      content: msg.body || msg.messageText || ''
+    })).filter((m: CoreMessage) => m.content !== '');
+
+    // 2. Generate Follow-up via LLM
+    console.log(`🤖 Generating follow-up for ${contactId}...`);
+    const { text: followUpMessage } = await handleStaleOpportunity(contactId, history);
+
+    // 3. Send text response to GHL
+    await sendMessage(contactId, followUpMessage, channel, phone);
+    
+    console.log(`✅ Successfully sent follow-up to ${contactId}`);
+  } catch (err) {
+    console.error('❌ Error handling follow-up:', err);
   }
 });
 

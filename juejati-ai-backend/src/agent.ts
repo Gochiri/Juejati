@@ -225,3 +225,22 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
 
   return { text: cleanText, images };
 }
+
+export async function handleStaleOpportunity(contactId: string, history: CoreMessage[]): Promise<{ text: string }> {
+  const messages: CoreMessage[] = [
+    ...history,
+    { 
+      role: 'user', 
+      content: "SYSTEM_NOTE: El cliente no ha respondido en las últimas horas. Generá un mensaje muy breve, amable y no invasivo para retomar la conversación ofreciendo tu ayuda o consultando si sigue buscando propiedades. No envíes más de 2 oraciones." 
+    }
+  ];
+
+  const result = await generateText({
+    model: openai('gpt-4o-mini'),
+    system: systemPrompt,
+    messages,
+    maxSteps: 1, // Sólo texto, no hay necesidad de usar tools para el follow-up
+  });
+
+  return { text: result.text.trim() };
+}
