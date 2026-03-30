@@ -108,7 +108,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
   const systemPrompt = await getSystemPrompt();
 
   const result = await generateText({
-    model: openai('gpt-4o-mini'),
+    model: openai('gpt-5.2-mini'),
     system: systemPrompt,
     messages,
     maxSteps: 5,
@@ -255,7 +255,7 @@ export async function handleStaleOpportunity(contactId: string, history: CoreMes
 
   const systemPrompt = await getSystemPrompt();
   const result = await generateText({
-    model: openai('gpt-4o-mini'),
+    model: openai('gpt-5.2-mini'),
     system: systemPrompt,
     messages,
     maxSteps: 1, // Sólo texto, no hay necesidad de usar tools para el follow-up
