@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { runAgent, handleStaleOpportunity } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
-import { logMessage, logError } from './admin-db.js';
+import { logMessage, logError, initAdminTables } from './admin-db.js';
 import adminRouter from './admin-routes.js';
 import { CoreMessage } from 'ai';
 
@@ -182,7 +182,15 @@ setInterval(async () => {
   }
 }, SYNC_INTERVAL_MS);
 
-app.listen(PORT, () => {
-  console.log(`🚀 AI Backend listening on port ${PORT}`);
-  console.log(`🔄 Property sync scheduled every 6 hours`);
-});
+// Initialize admin tables and start server
+initAdminTables()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 AI Backend listening on port ${PORT}`);
+      console.log(`🔄 Property sync scheduled every 6 hours`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Failed to initialize admin tables:', err.message);
+    process.exit(1);
+  });
