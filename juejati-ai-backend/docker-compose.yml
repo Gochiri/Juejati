@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   juejati-ai-agent:
-    build: .
-    image: juejati-ai-backend:latest
+    image: ghcr.io/gochiri/juejati-ai-backend:latest
     environment:
       - NODE_ENV=production
       - PORT=4000
