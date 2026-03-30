@@ -34,7 +34,7 @@ export async function searchProperties(embedding: number[], filters: PropertyFil
     barrio = null,
     presupuesto_max = null,
     limit = 5,
-    threshold = 0.5,
+    threshold = 0.35,
   } = filters;
 
   const sql = `

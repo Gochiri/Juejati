@@ -52,7 +52,8 @@ Cuando tengas zona, tipo, ambientes, presupuesto y operación:
 1. Usá 'search_internal_properties' INMEDIATAMENTE. No anuncies que vas a buscar.
 2. Si no hay resultados internos, usá 'fallback_zonaprop_scraper'.
 3. Si tampoco hay resultados externos, informá al cliente que un asesor se comunicará.
-4. Si el cliente pide foto/imagen de una propiedad, volvé a llamar 'search_internal_properties' con los datos que ya tenés — las fotos se envían automáticamente por el sistema, nunca digas que no podés enviar imágenes.
+4. Si el cliente pide foto/imagen de una propiedad, volvé a llamar 'search_internal_properties' con los datos que ya tenés — las fotos se envían automáticamente por el sistema como adjuntos.
+   ⚠️ PROHIBIDO decir "no puedo enviar imágenes/fotos" o similar. El sistema SÍ envía fotos automáticamente después de cada búsqueda.
 
 ════════════════════ FORMATO DE RESULTADOS ════════════════════
 
@@ -71,6 +72,7 @@ SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zona
 Cada vez que obtengas info nueva del cliente (zona, presupuesto, tipo, etc.),
 usá 'update_ghl_contact' para guardar esos datos en el CRM.
 Usá 'add_ghl_tag' para etiquetar según corresponda (ej: "busqueda_activa", "quiere visitar").
+Actualizá 'score_lead' en cada update: "frio" (solo pregunta), "tibio" (dio datos de búsqueda), "caliente" (quiere visitar/comprar).
 
 ════════════════════ AGENDAMIENTO ════════════════════
 
@@ -128,7 +130,12 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           if (imgs.length > 0) {
             await saveContactImages(contactId, imgs);
           }
-          return results;
+          return {
+            properties: results,
+            _system_note: imgs.length > 0
+              ? `${imgs.length} foto(s) se enviarán automáticamente al cliente. NO digas que no podés enviar fotos.`
+              : 'No se encontraron fotos para estas propiedades.'
+          };
         }
       }),
 
@@ -175,6 +182,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           propiedad_de_interes: z.string().optional().describe('Título o ID de propiedad que le interesó'),
           propiedad_tokko_id: z.number().optional().describe('Tokko ID de la propiedad de interés'),
           caracteristicas: z.string().optional().describe('Características deseadas por el cliente'),
+          score_lead: z.enum(['frio', 'tibio', 'caliente']).optional().describe('Score del lead: "frio" (solo pregunta), "tibio" (dio datos concretos de búsqueda), "caliente" (quiere visitar o comprar)'),
         }),
         execute: async (args) => {
           const fields: { id: string; field_value: any }[] = [];
@@ -187,6 +195,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           if (args.propiedad_de_interes) fields.push({ id: GHL_FIELD_IDS.propiedad_de_interes, field_value: args.propiedad_de_interes });
           if (args.propiedad_tokko_id) fields.push({ id: GHL_FIELD_IDS.propiedad_tokko_id, field_value: args.propiedad_tokko_id });
           if (args.caracteristicas) fields.push({ id: GHL_FIELD_IDS.caracteristicas_deseadas, field_value: args.caracteristicas });
+          if (args.score_lead) fields.push({ id: GHL_FIELD_IDS.score_lead, field_value: args.score_lead });
 
           if (fields.length > 0) {
             await updateContactFields(contactId, fields);

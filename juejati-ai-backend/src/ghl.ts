@@ -3,6 +3,8 @@ dotenv.config();
 
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
 const ghlApiKey = (process.env.GHL_API_KEY || '').replace(/^Bearer\s+/i, '');
+const ghlLocationId = process.env.GHL_LOCATION_ID;
+const ghlFromNumber = process.env.GHL_FROM_NUMBER;
 const headers = {
   'Authorization': `Bearer ${ghlApiKey}`,
   'Version': '2021-07-28',
@@ -79,8 +81,8 @@ export async function sendMessage(contactId: string, message: string, incomingTy
     conversationId,
     contactId,
     message,
-    locationId: process.env.GHL_LOCATION_ID,
-    fromNumber: process.env.GHL_FROM_NUMBER,
+    locationId: ghlLocationId,
+    fromNumber: ghlFromNumber,
   };
   if (toNumber) payload.toNumber = toNumber;
   if (attachments.length > 0) payload.attachments = attachments;

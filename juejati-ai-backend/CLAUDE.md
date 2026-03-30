@@ -117,6 +117,7 @@ GHL_FROM_NUMBER=...          # número desde el que se envían mensajes
 DATABASE_URL=postgresql://...
 SCRAPER_API_URL=http://zonaprop-scraper:3000/api/search
 TOKKO_API_KEY=...
+SYNC_SECRET=...             # Bearer token para POST /sync (requerido para auth)
 ```
 
 ---
@@ -144,7 +145,7 @@ docker service update --image juejati-ai-backend:latest juejati-ai-agent
 
 ---
 
-## Estado de implementación (~75%)
+## Estado de implementación (~90%)
 
 ### Completo
 
@@ -161,16 +162,16 @@ docker service update --image juejati-ai-backend:latest juejati-ai-agent
 | Follow-up de oportunidades estancadas | ✅ |
 | Deploy Docker Swarm + Traefik | ✅ |
 
-### Issues pendientes
+### Issues resueltos (marzo 2026)
 
-| Prioridad | Problema | Detalle |
-|-----------|----------|---------|
-| 🔴 Alto | `GHL_LOCATION_ID` y `GHL_FROM_NUMBER` ausentes en `.env` | `sendMessage` los usa sin fallback — envío puede fallar silenciosamente |
-| 🔴 Alto | Bug "no puedo enviar fotos" | El agente ignora el system prompt en ciertos contextos y responde que no puede enviar imágenes |
-| 🟡 Medio | Respuestas vacías del agente | Se generan mensajes `""` cuando el paso es solo tool call (sin texto final) |
-| 🟡 Medio | `/sync` sin autenticación | Cualquiera puede disparar un sync costoso (embeddings × todas las propiedades) |
-| 🟢 Bajo | `score_lead` nunca se escribe | Definido en `GHL_FIELD_IDS` pero el agente no tiene lógica para calcularlo |
-| 🟢 Bajo | Threshold inconsistente | `0.5` hardcodeado en `db.ts` vs `0.3` en la función SQL `match_propiedades_v2` |
+| Issue | Solución |
+|-------|----------|
+| `GHL_LOCATION_ID`/`GHL_FROM_NUMBER` ausentes | Validación al startup con `process.exit(1)` |
+| Bug "no puedo enviar fotos" | `_system_note` en tool result + refuerzo en system prompt |
+| Respuestas vacías del agente | Skip de `sendMessage` cuando texto es vacío |
+| `/sync` sin autenticación | Bearer token via `SYNC_SECRET` env var |
+| `score_lead` nunca se escribe | Nuevo param en `update_ghl_contact` (frio/tibio/caliente) |
+| Threshold inconsistente | Unificado a `0.35` en `db.ts` |
 
 ### Descartado
 

@@ -8,6 +8,14 @@ import { CoreMessage } from 'ai';
 
 dotenv.config();
 
+// Validate required environment variables
+const REQUIRED_ENV = ['GHL_API_KEY', 'GHL_LOCATION_ID', 'GHL_FROM_NUMBER', 'OPENAI_API_KEY', 'DATABASE_URL'] as const;
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length > 0) {
+  console.error(`❌ Missing required env vars: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -50,8 +58,12 @@ app.post('/webhook/ghl', async (req, res) => {
     const { text: agentResponse, images } = await runAgent(contactId, history, messageBody);
     console.log(`🖼️ Images extracted: ${images.length} - ${JSON.stringify(images)}`);
 
-    // 3. Send text response to GHL
-    await sendMessage(contactId, agentResponse, channel, phone);
+    // 3. Send text response to GHL (skip empty responses from tool-only turns)
+    if (agentResponse.trim()) {
+      await sendMessage(contactId, agentResponse, channel, phone);
+    } else {
+      console.warn(`⚠️ Agent returned empty text for ${contactId}, skipping text message`);
+    }
 
     // 4. Send images as separate attachment-only messages (more reliable for WhatsApp)
     for (const imageUrl of images) {
@@ -113,9 +125,13 @@ app.get('/health', (req, res) => {
   res.send('Juejati AI Backend is running.');
 });
 
-// Sync manual: POST /sync (proteger con un secret en producción)
+// Sync manual: POST /sync
 let syncRunning = false;
 app.post('/sync', async (_req, res) => {
+  const token = _req.headers.authorization?.replace('Bearer ', '');
+  if (!process.env.SYNC_SECRET || token !== process.env.SYNC_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
   if (syncRunning) {
     return res.status(409).json({ error: 'Sync already running' });
   }
