@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { getConfig, setConfig, getRecentMessages, getRecentErrors } from './admin-db.js';
+import { getConfig, setConfig, getRecentMessages, getRecentErrors, getConversationContacts, getConversation, getUsageStats } from './admin-db.js';
 import { pool } from './db.js';
 
 const router = Router();
@@ -62,6 +62,19 @@ router.get('/admin/api/errors', async (req, res) => {
   res.json(errors);
 });
 
+// Conversations list
+router.get('/admin/api/conversations', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+  const contacts = await getConversationContacts(limit);
+  res.json(contacts);
+});
+
+// Single conversation
+router.get('/admin/api/conversations/:contactId', async (req, res) => {
+  const messages = await getConversation(req.params.contactId);
+  res.json(messages);
+});
+
 // Get system prompt
 router.get('/admin/api/prompt', async (_req, res) => {
   const prompt = await getConfig('system_prompt');
@@ -76,6 +89,28 @@ router.put('/admin/api/prompt', async (req, res) => {
   }
   await setConfig('system_prompt', value);
   res.json({ success: true });
+});
+
+// Get model
+router.get('/admin/api/model', async (_req, res) => {
+  const model = await getConfig('openai_model');
+  res.json({ value: model || 'gpt-5.2-mini' });
+});
+
+// Update model
+router.put('/admin/api/model', async (req, res) => {
+  const { value } = req.body;
+  if (!value || typeof value !== 'string') {
+    return res.status(400).json({ error: 'Missing model value' });
+  }
+  await setConfig('openai_model', value);
+  res.json({ success: true });
+});
+
+// Usage / cost stats
+router.get('/admin/api/usage', async (_req, res) => {
+  const usage = await getUsageStats();
+  res.json(usage);
 });
 
 // Stats

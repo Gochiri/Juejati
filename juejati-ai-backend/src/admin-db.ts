@@ -17,6 +17,17 @@ export async function initAdminTables() {
       images JSONB DEFAULT '[]',
       created_at TIMESTAMPTZ DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS usage_log (
+      id BIGSERIAL PRIMARY KEY,
+      contact_id TEXT,
+      model TEXT NOT NULL,
+      prompt_tokens INT DEFAULT 0,
+      completion_tokens INT DEFAULT 0,
+      total_tokens INT DEFAULT 0,
+      estimated_cost_usd NUMERIC(10,6) DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_log_created_at ON usage_log (created_at);
     CREATE TABLE IF NOT EXISTS error_log (
       id BIGSERIAL PRIMARY KEY,
       source TEXT NOT NULL,
@@ -73,4 +84,42 @@ export async function getRecentErrors(limit = 50) {
     [limit]
   );
   return res.rows;
+}
+
+export async function getConversationContacts(limit = 30) {
+  const res = await pool.query(
+    `SELECT contact_id, MAX(created_at) as last_message, COUNT(*) as msg_count
+     FROM message_log GROUP BY contact_id ORDER BY last_message DESC LIMIT $1`,
+    [limit]
+  );
+  return res.rows;
+}
+
+export async function getConversation(contactId: string) {
+  const res = await pool.query(
+    'SELECT id, direction, body, channel, images, created_at FROM message_log WHERE contact_id = $1 ORDER BY created_at ASC',
+    [contactId]
+  );
+  return res.rows;
+}
+
+export async function logUsage(contactId: string | null, model: string, promptTokens: number, completionTokens: number, costUsd: number) {
+  await pool.query(
+    'INSERT INTO usage_log (contact_id, model, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd) VALUES ($1, $2, $3, $4, $5, $6)',
+    [contactId, model, promptTokens, completionTokens, promptTokens + completionTokens, costUsd]
+  );
+}
+
+export async function getUsageStats() {
+  const res = await pool.query(`
+    SELECT
+      COALESCE(SUM(total_tokens), 0) as total_tokens,
+      COALESCE(SUM(estimated_cost_usd), 0) as total_cost_usd,
+      COUNT(*) as total_calls,
+      COALESCE(SUM(CASE WHEN created_at > now() - interval '24 hours' THEN total_tokens ELSE 0 END), 0) as tokens_24h,
+      COALESCE(SUM(CASE WHEN created_at > now() - interval '24 hours' THEN estimated_cost_usd ELSE 0 END), 0) as cost_24h,
+      COALESCE(SUM(CASE WHEN created_at > now() - interval '30 days' THEN estimated_cost_usd ELSE 0 END), 0) as cost_30d
+    FROM usage_log
+  `);
+  return res.rows[0];
 }

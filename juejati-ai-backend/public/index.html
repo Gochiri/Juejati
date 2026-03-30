@@ -11,7 +11,7 @@
   <main class="container">
     <h1>Juejati Admin</h1>
 
-    <!-- Health -->
+    <!-- Health + Stats -->
     <section id="health-section">
       <h2>Estado del servicio</h2>
       <div class="grid">
@@ -28,7 +28,7 @@
           <strong>DB:</strong> <span id="health-db">-</span>
         </div>
       </div>
-      <div class="grid" id="stats-grid">
+      <div class="grid">
         <div class="card">
           <strong>Propiedades activas:</strong> <span id="stat-props">-</span>
         </div>
@@ -39,6 +39,41 @@
           <strong>Errores (24h):</strong> <span id="stat-errs">-</span>
         </div>
       </div>
+    </section>
+
+    <!-- Usage / Costs -->
+    <section id="usage-section">
+      <h2>Consumo de OpenAI</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Gasto hoy:</strong> <span id="usage-cost-24h">-</span>
+        </div>
+        <div class="card">
+          <strong>Gasto mes:</strong> <span id="usage-cost-30d">-</span>
+        </div>
+        <div class="card">
+          <strong>Gasto total:</strong> <span id="usage-cost-total">-</span>
+        </div>
+        <div class="card">
+          <strong>Tokens hoy:</strong> <span id="usage-tokens-24h">-</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Model selector -->
+    <section id="model-section">
+      <h2>Modelo de OpenAI</h2>
+      <div class="model-row">
+        <select id="model-select">
+          <option value="gpt-5.2-mini">gpt-5.2-mini (barato)</option>
+          <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+          <option value="gpt-4o">gpt-4o (caro)</option>
+          <option value="gpt-4.1">gpt-4.1 (caro)</option>
+        </select>
+        <button id="model-save">Guardar</button>
+      </div>
+      <p id="model-status"></p>
     </section>
 
     <!-- Errors -->
@@ -58,23 +93,17 @@
       </table>
     </section>
 
-    <!-- Messages -->
-    <section id="messages-section">
-      <h2>Mensajes recientes</h2>
-      <table role="grid">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Contacto</th>
-            <th>Dir</th>
-            <th>Canal</th>
-            <th>Mensaje</th>
-          </tr>
-        </thead>
-        <tbody id="messages-body">
-          <tr><td colspan="5">Cargando...</td></tr>
-        </tbody>
-      </table>
+    <!-- Conversations -->
+    <section id="conversations-section">
+      <h2>Conversaciones</h2>
+      <div class="conversations-layout">
+        <div class="contact-list" id="contact-list">
+          <p>Cargando...</p>
+        </div>
+        <div class="chat-view" id="chat-view">
+          <p class="chat-placeholder">Selecciona un contacto para ver la conversacion</p>
+        </div>
+      </div>
     </section>
 
     <!-- Prompt Editor -->

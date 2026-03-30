@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { searchProperties, saveContactImages, getContactImages } from './db.js';
 import { searchZonaPropScraper } from './scraper.js';
 import { addContactTag, updateContactFields } from './ghl.js';
-import { getConfig } from './admin-db.js';
+import { getConfig, logUsage } from './admin-db.js';
 
 // IDs reales de custom fields en GHL (Location: WWrBqekGJCsCmSSvPzEf)
 const GHL_FIELD_IDS = {
@@ -90,6 +90,25 @@ async function getSystemPrompt(): Promise<string> {
   return dbPrompt || DEFAULT_SYSTEM_PROMPT;
 }
 
+async function getModelId(): Promise<string> {
+  const model = await getConfig('openai_model');
+  return model || 'gpt-5.2-mini';
+}
+
+// Cost per 1M tokens (approximate)
+const MODEL_COSTS: Record<string, { input: number; output: number }> = {
+  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'gpt-4o': { input: 2.50, output: 10.00 },
+  'gpt-4.1-mini': { input: 0.40, output: 1.60 },
+  'gpt-4.1': { input: 2.00, output: 8.00 },
+  'gpt-5.2-mini': { input: 0.15, output: 0.60 },
+};
+
+function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
+  const costs = MODEL_COSTS[model] || { input: 0.15, output: 0.60 };
+  return (promptTokens * costs.input + completionTokens * costs.output) / 1_000_000;
+}
+
 async function getEmbedding(text: string): Promise<number[]> {
   const { embedding } = await embed({
     model: openai.embedding('text-embedding-3-small'),
@@ -106,9 +125,10 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
 
   const collectedImages: string[] = [];
   const systemPrompt = await getSystemPrompt();
+  const modelId = await getModelId();
 
   const result = await generateText({
-    model: openai('gpt-5.2-mini'),
+    model: openai(modelId),
     system: systemPrompt,
     messages,
     maxSteps: 5,
@@ -224,6 +244,14 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     }
   });
 
+  // Track token usage
+  const usage = result.usage;
+  if (usage) {
+    const cost = estimateCost(modelId, usage.promptTokens, usage.completionTokens);
+    logUsage(contactId, modelId, usage.promptTokens, usage.completionTokens, cost).catch(() => {});
+    console.log(`💰 Tokens: ${usage.promptTokens}+${usage.completionTokens} = ${usage.totalTokens} (~$${cost.toFixed(4)})`);
+  }
+
   // Extract image URLs from markdown patterns in text: ![Foto](url) or ![Imagen](url)
   const inlineImageRegex = /!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\((https?:\/\/[^)]+)\)/g;
   let match;
@@ -254,12 +282,19 @@ export async function handleStaleOpportunity(contactId: string, history: CoreMes
   ];
 
   const systemPrompt = await getSystemPrompt();
+  const modelId = await getModelId();
   const result = await generateText({
-    model: openai('gpt-5.2-mini'),
+    model: openai(modelId),
     system: systemPrompt,
     messages,
-    maxSteps: 1, // Sólo texto, no hay necesidad de usar tools para el follow-up
+    maxSteps: 1,
   });
+
+  const usage = result.usage;
+  if (usage) {
+    const cost = estimateCost(modelId, usage.promptTokens, usage.completionTokens);
+    logUsage(contactId, modelId, usage.promptTokens, usage.completionTokens, cost).catch(() => {});
+  }
 
   return { text: result.text.trim() };
 }

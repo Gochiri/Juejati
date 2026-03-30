@@ -49,6 +49,17 @@ async function loadStats() {
   } catch {}
 }
 
+// Usage
+async function loadUsage() {
+  try {
+    const data = await fetchJSON('/usage');
+    document.getElementById('usage-cost-24h').textContent = `$${parseFloat(data.cost_24h).toFixed(4)}`;
+    document.getElementById('usage-cost-30d').textContent = `$${parseFloat(data.cost_30d).toFixed(4)}`;
+    document.getElementById('usage-cost-total').textContent = `$${parseFloat(data.total_cost_usd).toFixed(4)}`;
+    document.getElementById('usage-tokens-24h').textContent = parseInt(data.tokens_24h).toLocaleString('es-AR');
+  } catch {}
+}
+
 // Errors
 async function loadErrors() {
   try {
@@ -62,7 +73,7 @@ async function loadErrors() {
       `<tr class="error-row">
         <td>${formatDate(e.created_at)}</td>
         <td>${e.source}</td>
-        <td title="${e.message}">${truncate(e.message, 80)}</td>
+        <td title="${(e.message || '').replace(/"/g, '&quot;')}">${truncate(e.message, 80)}</td>
       </tr>`
     ).join('');
   } catch {
@@ -70,27 +81,77 @@ async function loadErrors() {
   }
 }
 
-// Messages
-async function loadMessages() {
+// Conversations
+async function loadConversations() {
   try {
-    const data = await fetchJSON('/messages?limit=30');
-    const tbody = document.getElementById('messages-body');
+    const data = await fetchJSON('/conversations');
+    const list = document.getElementById('contact-list');
     if (data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5">Sin mensajes</td></tr>';
+      list.innerHTML = '<p>Sin conversaciones</p>';
       return;
     }
-    tbody.innerHTML = data.map(m =>
-      `<tr>
-        <td>${formatDate(m.created_at)}</td>
-        <td title="${m.contact_id}">${m.contact_id.slice(0, 8)}...</td>
-        <td class="${m.direction === 'inbound' ? 'dir-in' : 'dir-out'}">${m.direction === 'inbound' ? 'IN' : 'OUT'}</td>
-        <td>${m.channel || '-'}</td>
-        <td title="${m.body || ''}">${truncate(m.body, 60)}</td>
-      </tr>`
+    list.innerHTML = data.map(c =>
+      `<div class="contact-item" data-contact="${c.contact_id}" onclick="loadChat('${c.contact_id}', this)">
+        <div class="contact-id">${c.contact_id.slice(0, 12)}...</div>
+        <div class="contact-meta">${c.msg_count} msgs - ${formatDate(c.last_message)}</div>
+      </div>`
     ).join('');
   } catch {
-    document.getElementById('messages-body').innerHTML = '<tr><td colspan="5">Error cargando datos</td></tr>';
+    document.getElementById('contact-list').innerHTML = '<p>Error cargando</p>';
   }
+}
+
+async function loadChat(contactId, el) {
+  // Mark active
+  document.querySelectorAll('.contact-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const chatView = document.getElementById('chat-view');
+  chatView.innerHTML = '<p>Cargando...</p>';
+
+  try {
+    const data = await fetchJSON(`/conversations/${contactId}`);
+    if (data.length === 0) {
+      chatView.innerHTML = '<p class="chat-placeholder">Sin mensajes</p>';
+      return;
+    }
+    chatView.innerHTML = data.map(m =>
+      `<div class="chat-bubble ${m.direction}">
+        <div>${m.body || '<em>imagen</em>'}</div>
+        <div class="chat-time">${formatDate(m.created_at)}</div>
+      </div>`
+    ).join('');
+    chatView.scrollTop = chatView.scrollHeight;
+  } catch {
+    chatView.innerHTML = '<p>Error cargando conversacion</p>';
+  }
+}
+
+// Model
+async function loadModel() {
+  try {
+    const data = await fetchJSON('/model');
+    document.getElementById('model-select').value = data.value;
+  } catch {}
+}
+
+async function saveModel() {
+  const value = document.getElementById('model-select').value;
+  const status = document.getElementById('model-status');
+  try {
+    const res = await fetch(API + '/model', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    status.textContent = 'Modelo actualizado. Aplica al proximo mensaje.';
+    status.style.color = '#22c55e';
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+    status.style.color = '#ef4444';
+  }
+  setTimeout(() => { status.textContent = ''; }, 3000);
 }
 
 // Prompt
@@ -132,16 +193,19 @@ async function savePrompt() {
 // Init
 document.getElementById('prompt-save').addEventListener('click', savePrompt);
 document.getElementById('prompt-editor').addEventListener('input', updateCharCount);
+document.getElementById('model-save').addEventListener('click', saveModel);
 
 function loadAll() {
   loadHealth();
   loadStats();
+  loadUsage();
   loadErrors();
-  loadMessages();
+  loadConversations();
 }
 
 loadAll();
 loadPrompt();
+loadModel();
 
 // Auto-refresh every 30 seconds
 setInterval(loadAll, 30000);
