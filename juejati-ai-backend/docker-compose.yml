@@ -13,6 +13,7 @@ services:
       - GHL_LOCATION_ID=${GHL_LOCATION_ID}
       - GHL_FROM_NUMBER=${GHL_FROM_NUMBER}
       - SYNC_SECRET=${SYNC_SECRET}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SCRAPER_API_URL=http://zonaprop-scraper:3000/api/search
     networks:
       - korvancenet

@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { runAgent, handleStaleOpportunity } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
+import { logMessage, logError } from './admin-db.js';
+import adminRouter from './admin-routes.js';
 import { CoreMessage } from 'ai';
 
 dotenv.config();
@@ -16,9 +20,15 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Admin dashboard routes (API + static files)
+app.use(adminRouter);
+app.use('/admin', express.static(path.join(__dirname, '..', 'public')));
 
 const PORT = process.env.PORT || 4000;
 
@@ -26,7 +36,7 @@ const PORT = process.env.PORT || 4000;
 app.post('/webhook/ghl', async (req, res) => {
   try {
     const payload = req.body;
-    
+
     // GHL sends type, contact_id, message, etc.
     const contactId = payload.contact_id;
     const phone = payload.phone || '';
@@ -44,9 +54,12 @@ app.post('/webhook/ghl', async (req, res) => {
     // Acknowledge webhook quickly to avoid GHL retries
     res.status(200).send({ success: true });
 
+    // Log inbound message
+    logMessage(contactId, 'inbound', messageBody, channel).catch(() => {});
+
     // 1. Fetch History
     const rawHistory = await getConversationHistory(contactId, 10);
-    
+
     // Convert GHL history to Vercel AI SDK format
     const history: CoreMessage[] = rawHistory.reverse().map((msg: any) => ({
       role: msg.direction === 'inbound' ? 'user' : 'assistant',
@@ -75,10 +88,13 @@ app.post('/webhook/ghl', async (req, res) => {
       }
     }
 
+    // Log outbound message
+    logMessage(contactId, 'outbound', agentResponse, channel, images).catch(() => {});
+
     console.log(`✅ Successfully replied to ${contactId} via ${channel}`);
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Error handling webhook:', err);
-    // If we hadn't already sent a response, we would do it here.
+    logError('webhook', err.message, err.stack).catch(() => {});
   }
 });
 
@@ -101,7 +117,7 @@ app.post('/api/followup', async (req, res) => {
 
     // 1. Fetch History
     const rawHistory = await getConversationHistory(contactId, 10);
-    
+
     // Convert GHL history to Vercel AI SDK format
     const history: CoreMessage[] = rawHistory.reverse().map((msg: any) => ({
       role: msg.direction === 'inbound' ? 'user' : 'assistant',
@@ -114,10 +130,12 @@ app.post('/api/followup', async (req, res) => {
 
     // 3. Send text response to GHL
     await sendMessage(contactId, followUpMessage, channel, phone);
-    
+    logMessage(contactId, 'outbound', followUpMessage, channel).catch(() => {});
+
     console.log(`✅ Successfully sent follow-up to ${contactId}`);
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Error handling follow-up:', err);
+    logError('followup', err.message, err.stack).catch(() => {});
   }
 });
 
@@ -141,6 +159,7 @@ app.post('/sync', async (_req, res) => {
     res.json({ success: true, ...result });
   } catch (err: any) {
     console.error('❌ Sync error:', err);
+    logError('sync', err.message, err.stack).catch(() => {});
     res.status(500).json({ error: err.message });
   } finally {
     syncRunning = false;
@@ -155,8 +174,9 @@ setInterval(async () => {
   try {
     console.log('⏰ Scheduled sync starting...');
     await syncProperties();
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Scheduled sync error:', err);
+    logError('sync', err.message, err.stack).catch(() => {});
   } finally {
     syncRunning = false;
   }

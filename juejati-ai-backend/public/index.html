@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juejati Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Juejati Admin</h1>
+
+    <!-- Health -->
+    <section id="health-section">
+      <h2>Estado del servicio</h2>
+      <div class="grid">
+        <div class="card">
+          <span id="health-status" class="status-badge offline">Offline</span>
+        </div>
+        <div class="card">
+          <strong>Uptime:</strong> <span id="health-uptime">-</span>
+        </div>
+        <div class="card">
+          <strong>Memoria:</strong> <span id="health-memory">-</span> MB
+        </div>
+        <div class="card">
+          <strong>DB:</strong> <span id="health-db">-</span>
+        </div>
+      </div>
+      <div class="grid" id="stats-grid">
+        <div class="card">
+          <strong>Propiedades activas:</strong> <span id="stat-props">-</span>
+        </div>
+        <div class="card">
+          <strong>Mensajes totales:</strong> <span id="stat-msgs">-</span>
+        </div>
+        <div class="card">
+          <strong>Errores (24h):</strong> <span id="stat-errs">-</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Errors -->
+    <section id="errors-section">
+      <h2>Errores recientes</h2>
+      <table role="grid">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Origen</th>
+            <th>Mensaje</th>
+          </tr>
+        </thead>
+        <tbody id="errors-body">
+          <tr><td colspan="3">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Messages -->
+    <section id="messages-section">
+      <h2>Mensajes recientes</h2>
+      <table role="grid">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Contacto</th>
+            <th>Dir</th>
+            <th>Canal</th>
+            <th>Mensaje</th>
+          </tr>
+        </thead>
+        <tbody id="messages-body">
+          <tr><td colspan="5">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Prompt Editor -->
+    <section id="prompt-section">
+      <h2>System Prompt de Sofia</h2>
+      <textarea id="prompt-editor" rows="20" placeholder="Cargando..."></textarea>
+      <div class="prompt-actions">
+        <span id="prompt-chars">0 caracteres</span>
+        <button id="prompt-save">Guardar</button>
+      </div>
+      <p id="prompt-status"></p>
+    </section>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

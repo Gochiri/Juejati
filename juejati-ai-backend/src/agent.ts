@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { searchProperties, saveContactImages, getContactImages } from './db.js';
 import { searchZonaPropScraper } from './scraper.js';
 import { addContactTag, updateContactFields } from './ghl.js';
+import { getConfig } from './admin-db.js';
 
 // IDs reales de custom fields en GHL (Location: WWrBqekGJCsCmSSvPzEf)
 const GHL_FIELD_IDS = {
@@ -23,7 +24,7 @@ const GHL_FIELD_IDS = {
   score_lead: 'zLRaEQ5pm9fWvKJsnoIo',
 } as const;
 
-const systemPrompt = `
+const DEFAULT_SYSTEM_PROMPT = `
 Sos Sofía, asesora virtual de Juejati Brokers con 10 años de experiencia en el mercado inmobiliario argentino.
 
 ════════════════════ REGLAS GENERALES ════════════════════
@@ -82,6 +83,13 @@ Si el cliente quiere ver una propiedad:
 3. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés.
 `;
 
+export { DEFAULT_SYSTEM_PROMPT };
+
+async function getSystemPrompt(): Promise<string> {
+  const dbPrompt = await getConfig('system_prompt');
+  return dbPrompt || DEFAULT_SYSTEM_PROMPT;
+}
+
 async function getEmbedding(text: string): Promise<number[]> {
   const { embedding } = await embed({
     model: openai.embedding('text-embedding-3-small'),
@@ -97,6 +105,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
   ];
 
   const collectedImages: string[] = [];
+  const systemPrompt = await getSystemPrompt();
 
   const result = await generateText({
     model: openai('gpt-4o-mini'),
@@ -238,12 +247,13 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
 export async function handleStaleOpportunity(contactId: string, history: CoreMessage[]): Promise<{ text: string }> {
   const messages: CoreMessage[] = [
     ...history,
-    { 
-      role: 'user', 
-      content: "SYSTEM_NOTE: El cliente no ha respondido en las últimas horas. Generá un mensaje muy breve, amable y no invasivo para retomar la conversación ofreciendo tu ayuda o consultando si sigue buscando propiedades. No envíes más de 2 oraciones." 
+    {
+      role: 'user',
+      content: "SYSTEM_NOTE: El cliente no ha respondido en las últimas horas. Generá un mensaje muy breve, amable y no invasivo para retomar la conversación ofreciendo tu ayuda o consultando si sigue buscando propiedades. No envíes más de 2 oraciones."
     }
   ];
 
+  const systemPrompt = await getSystemPrompt();
   const result = await generateText({
     model: openai('gpt-4o-mini'),
     system: systemPrompt,

@@ -161,3 +161,37 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- ============================================================
+-- Admin Dashboard: config, message log, error log
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS system_config (
+  id         SERIAL PRIMARY KEY,
+  key        TEXT UNIQUE NOT NULL,
+  value      TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS message_log (
+  id         BIGSERIAL PRIMARY KEY,
+  contact_id TEXT NOT NULL,
+  direction  TEXT NOT NULL,        -- 'inbound' or 'outbound'
+  body       TEXT,
+  channel    TEXT,
+  images     JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS error_log (
+  id         BIGSERIAL PRIMARY KEY,
+  source     TEXT NOT NULL,        -- 'webhook', 'sync', 'agent', 'ghl'
+  message    TEXT NOT NULL,
+  stack      TEXT,
+  metadata   JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_log_created_at ON message_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_message_log_contact_id ON message_log (contact_id);
+CREATE INDEX IF NOT EXISTS idx_error_log_created_at ON error_log (created_at);
