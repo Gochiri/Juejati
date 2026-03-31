@@ -11,6 +11,19 @@ const headers = {
   'Content-Type': 'application/json',
 };
 
+export async function getContactName(contactId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, { method: 'GET', headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const contact = data.contact || data;
+    const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+    return name || contact.name || contact.email || contact.phone || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getConversationHistory(contactId: string, limit = 20) {
   // Step 1: find the conversation for this contact
   const searchRes = await fetch(`${GHL_API_BASE}/conversations/search?contactId=${contactId}&limit=1`, { method: 'GET', headers });

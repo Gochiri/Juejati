@@ -28,6 +28,11 @@ export async function initAdminTables() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_usage_log_created_at ON usage_log (created_at);
+    CREATE TABLE IF NOT EXISTS contact_names (
+      contact_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS error_log (
       id BIGSERIAL PRIMARY KEY,
       source TEXT NOT NULL,
@@ -108,6 +113,27 @@ export async function logUsage(contactId: string | null, model: string, promptTo
     'INSERT INTO usage_log (contact_id, model, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd) VALUES ($1, $2, $3, $4, $5, $6)',
     [contactId, model, promptTokens, completionTokens, promptTokens + completionTokens, costUsd]
   );
+}
+
+export async function saveContactName(contactId: string, name: string) {
+  await pool.query(
+    `INSERT INTO contact_names (contact_id, name, updated_at) VALUES ($1, $2, now())
+     ON CONFLICT (contact_id) DO UPDATE SET name = EXCLUDED.name, updated_at = now()`,
+    [contactId, name]
+  );
+}
+
+export async function getContactNames(contactIds: string[]): Promise<Record<string, string>> {
+  if (contactIds.length === 0) return {};
+  const res = await pool.query(
+    'SELECT contact_id, name FROM contact_names WHERE contact_id = ANY($1)',
+    [contactIds]
+  );
+  const map: Record<string, string> = {};
+  for (const row of res.rows) {
+    map[row.contact_id] = row.name;
+  }
+  return map;
 }
 
 export async function getUsageStats() {

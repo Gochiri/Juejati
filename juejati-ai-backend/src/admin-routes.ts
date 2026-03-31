@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { getConfig, setConfig, getRecentMessages, getRecentErrors, getConversationContacts, getConversation, getUsageStats } from './admin-db.js';
+import { getConfig, setConfig, getRecentMessages, getRecentErrors, getConversationContacts, getConversation, getUsageStats, getContactNames } from './admin-db.js';
 import { pool } from './db.js';
 
 const router = Router();
@@ -66,7 +66,13 @@ router.get('/admin/api/errors', async (req, res) => {
 router.get('/admin/api/conversations', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
   const contacts = await getConversationContacts(limit);
-  res.json(contacts);
+  const contactIds = contacts.map((c: any) => c.contact_id);
+  const names = await getContactNames(contactIds);
+  const enriched = contacts.map((c: any) => ({
+    ...c,
+    name: names[c.contact_id] || null,
+  }));
+  res.json(enriched);
 });
 
 // Single conversation

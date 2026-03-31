@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 import { runAgent, handleStaleOpportunity } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
-import { logMessage, logError, initAdminTables } from './admin-db.js';
+import { logMessage, logError, initAdminTables, saveContactName } from './admin-db.js';
+import { getContactName } from './ghl.js';
 import adminRouter from './admin-routes.js';
 import { CoreMessage } from 'ai';
 
@@ -54,8 +55,11 @@ app.post('/webhook/ghl', async (req, res) => {
     // Acknowledge webhook quickly to avoid GHL retries
     res.status(200).send({ success: true });
 
-    // Log inbound message
+    // Log inbound message and cache contact name
     logMessage(contactId, 'inbound', messageBody, channel).catch(() => {});
+    getContactName(contactId).then(name => {
+      if (name) saveContactName(contactId, name).catch(() => {});
+    }).catch(() => {});
 
     // 1. Fetch History
     const rawHistory = await getConversationHistory(contactId, 10);

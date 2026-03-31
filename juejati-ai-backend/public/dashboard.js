@@ -92,7 +92,7 @@ async function loadConversations() {
     }
     list.innerHTML = data.map(c =>
       `<div class="contact-item" data-contact="${c.contact_id}" onclick="loadChat('${c.contact_id}', this)">
-        <div class="contact-id">${c.contact_id.slice(0, 12)}...</div>
+        <div class="contact-id">${c.name || c.contact_id.slice(0, 12) + '...'}</div>
         <div class="contact-meta">${c.msg_count} msgs - ${formatDate(c.last_message)}</div>
       </div>`
     ).join('');
