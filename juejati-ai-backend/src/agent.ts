@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { generateText, tool, CoreMessage, embed } from 'ai';
 import { z } from 'zod';
 import { searchProperties, saveContactImages, getContactImages } from './db.js';
-import { searchZonaPropScraper } from './scraper.js';
+import { searchZonaPropScraper, buildCatalogUrl } from './scraper.js';
 import { addContactTag, updateContactFields } from './ghl.js';
 import { getConfig, logUsage } from './admin-db.js';
 
@@ -124,6 +124,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
   ];
 
   const collectedImages: string[] = [];
+  let searchPerformed = false;
   const systemPrompt = await getSystemPrompt();
   const modelId = await getModelId();
 
@@ -145,14 +146,25 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         }),
         execute: async (args) => {
           const embedding = await getEmbedding(args.query_semantica);
-          const results = await searchProperties(embedding, {
+          let results = await searchProperties(embedding, {
             operacion: args.operacion,
             tipo: args.tipo,
             ambientes: args.ambientes,
             barrio: args.zona,
             presupuesto_max: args.presupuesto_max,
           });
+          // If barrio filter returned nothing, retry without it — Tokko may store
+          // the district name instead of the neighborhood (e.g. "Almagro" for "Abasto")
+          if (results.length === 0 && args.zona) {
+            results = await searchProperties(embedding, {
+              operacion: args.operacion,
+              tipo: args.tipo,
+              ambientes: args.ambientes,
+              presupuesto_max: args.presupuesto_max,
+            });
+          }
           // Collect image URLs for attachments (max 3 to avoid spam)
+          searchPerformed = true;
           const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen).slice(0, 3);
           console.log(`🔍 Tool results: ${results.length} properties, ${imgs.length} images: ${JSON.stringify(imgs)}`);
           collectedImages.push(...imgs);
@@ -184,19 +196,26 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           // Scraper returns { properties: [...], html: '...' } or an array
           const properties: any[] = Array.isArray(raw) ? raw : (raw?.properties || []);
           // Collect images and use rebrandedUrl instead of raw zonaprop link (max 3)
+          searchPerformed = true;
           const imgs = properties.filter((r: any) => r.image).map((r: any) => r.image).slice(0, 3);
           collectedImages.push(...imgs);
           if (imgs.length > 0) {
             await saveContactImages(contactId, imgs);
           }
+          // Build catalog URL so the agent can share a single link with all results
+          const catalogUrl = buildCatalogUrl({ tipo: args.tipo, operacion: args.operacion, barrio: args.zona });
           // Map to cleaner format so agent never sees the raw zonaprop link
-          return properties.map((r: any) => ({
-            titulo: r.title,
-            precio: r.price,
-            ubicacion: r.location,
-            caracteristicas: r.features,
-            link_web: r.rebrandedUrl || '',
-          }));
+          return {
+            properties: properties.map((r: any) => ({
+              titulo: r.title,
+              precio: r.price,
+              ubicacion: r.location,
+              caracteristicas: r.features,
+              link_web: r.rebrandedUrl || '',
+            })),
+            catalog_url: catalogUrl,
+            _system_note: `Incluí este link al final de tu respuesta: "Ver catálogo completo: ${catalogUrl}"`,
+          };
         }
       }),
 
@@ -261,9 +280,9 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
   // Strip inline image markdown from text
   const cleanText = result.text.replace(/!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '').trim();
 
-  // If no new images from this turn, fall back to DB-persisted images from last search
+  // Only return cached images if a search was performed this turn but yielded no images
   let images = collectedImages;
-  if (images.length === 0) {
+  if (searchPerformed && images.length === 0) {
     images = await getContactImages(contactId);
     console.log(`📦 Using cached images for ${contactId}: ${images.length}`);
   }
