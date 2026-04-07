@@ -92,7 +92,7 @@ async function getSystemPrompt(): Promise<string> {
 
 async function getModelId(): Promise<string> {
   const model = await getConfig('openai_model');
-  return model || 'gpt-5.2-mini';
+  return model || 'gpt-4.1-mini';
 }
 
 // Cost per 1M tokens (approximate)

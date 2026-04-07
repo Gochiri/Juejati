@@ -100,7 +100,7 @@ router.put('/admin/api/prompt', async (req, res) => {
 // Get model
 router.get('/admin/api/model', async (_req, res) => {
   const model = await getConfig('openai_model');
-  res.json({ value: model || 'gpt-5.2-mini' });
+  res.json({ value: model || 'gpt-4.1-mini' });
 });
 
 // Update model
