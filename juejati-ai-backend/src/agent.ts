@@ -95,6 +95,35 @@ async function getModelId(): Promise<string> {
   return model || 'gpt-4.1-mini';
 }
 
+// Mapa de sub-barrios → distrito Tokko
+// Tokko guarda barrios a nivel distrito, no sub-barrios
+const BARRIO_ALIASES: Record<string, string> = {
+  'el botanico': 'Palermo',
+  'botanico': 'Palermo',
+  'el botánico': 'Palermo',
+  'botánico': 'Palermo',
+  'palermo soho': 'Palermo',
+  'soho': 'Palermo',
+  'palermo hollywood': 'Palermo',
+  'hollywood': 'Palermo',
+  'las cañitas': 'Palermo',
+  'cañitas': 'Palermo',
+  'palermo chico': 'Palermo Chico',
+  'barrio parque': 'Palermo Chico',
+  'villa freud': 'Palermo',
+  'abasto': 'Abasto',
+  'corrientes': 'Abasto',
+  'cid campeador': 'Cid Campeador',
+  'flores norte': 'Flores Norte',
+  'caballito norte': 'Caballito Norte',
+  'barrio norte': 'Barrio Norte',
+};
+
+function normalizarBarrio(zona: string): string {
+  const key = zona.toLowerCase().trim();
+  return BARRIO_ALIASES[key] || zona;
+}
+
 // Cost per 1M tokens (approximate)
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
@@ -146,15 +175,17 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         }),
         execute: async (args) => {
           const embedding = await getEmbedding(args.query_semantica);
+          const barrioNormalizado = args.zona ? normalizarBarrio(args.zona) : undefined;
           let results = await searchProperties(embedding, {
             operacion: args.operacion,
             tipo: args.tipo,
             ambientes: args.ambientes,
-            barrio: args.zona,
+            barrio: barrioNormalizado,
             presupuesto_max: args.presupuesto_max,
           });
           // If barrio filter returned nothing, retry without it — Tokko may store
           // the district name instead of the neighborhood (e.g. "Almagro" for "Abasto")
+          let zonaExacta = results.length > 0;
           if (results.length === 0 && args.zona) {
             results = await searchProperties(embedding, {
               operacion: args.operacion,
@@ -173,6 +204,9 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           }
           return {
             properties: results,
+            _zona_note: !zonaExacta && args.zona
+              ? `No hay propiedades exactas en "${args.zona}" en nuestra base. Estos son los más cercanos disponibles — aclaráselo al cliente y ofrecé buscar en zonas alternativas.`
+              : undefined,
             _system_note: imgs.length > 0
               ? `${imgs.length} foto(s) se enviarán automáticamente al cliente. NO digas que no podés enviar fotos.`
               : 'No se encontraron fotos para estas propiedades.'
