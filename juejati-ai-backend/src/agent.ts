@@ -65,11 +65,12 @@ Cuando tengas zona, ambientes y presupuesto:
 Encontré estas opciones en [zona]:
 
 1) **[Título]**
-   💰 [precio]
+   💰 [precio] (si no hay precio → «Consultar»)
    📍 [dirección/barrio]
    🏠 [ambientes] amb · [superficie] m²
    🔗 [link_web]
 
+⚠️ SIEMPRE mostrá el precio. Si el dato no está disponible, escribí «Consultar» — nunca omitas la línea de precio.
 SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
 
 ════════════════════ ACTUALIZACIÓN DE DATOS ════════════════════
@@ -83,8 +84,11 @@ Actualizá 'score_lead' en cada update: "frio" (solo pregunta), "tibio" (dio dat
 
 Si el cliente quiere ver una propiedad:
 1. Preguntá: «¿Pensás comprar en efectivo o con crédito?»
-2. Indicá que un asesor humano se va a comunicar para coordinar la visita.
-3. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés.
+   → Guardá con update_ghl_contact: forma_pago = "contado" o "credito"
+2. Si no sabés cuándo planea comprar, preguntá: «¿Estás pensando en algo para los próximos meses o es para más adelante?»
+   → Guardá con update_ghl_contact: timeline = "ahora", "6_meses" o "1_anio"
+3. Indicá que un asesor humano se va a comunicar para coordinar la visita.
+4. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés, forma_pago y timeline.
 `;
 
 export { DEFAULT_SYSTEM_PROMPT };
@@ -168,10 +172,9 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     maxSteps: 5,
     tools: {
       search_internal_properties: tool({
-        description: 'Búsqueda semántica en la base de datos interna de propiedades (Supabase/Tokko). Usar siempre primero.',
+        description: 'Búsqueda semántica en la base de datos interna de departamentos (Supabase/Tokko). Usar siempre primero.',
         parameters: z.object({
           zona: z.string().optional().describe('Barrio o zona. Ej: Palermo, Recoleta'),
-          tipo: z.string().optional().describe('Tipo de propiedad: departamento, casa, local comercial, terreno'),
           operacion: z.string().optional().describe('venta o alquiler'),
           ambientes: z.number().optional().describe('Cantidad de ambientes'),
           presupuesto_max: z.number().optional().describe('Presupuesto máximo en USD'),
@@ -182,7 +185,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           const barrioNormalizado = args.zona ? normalizarBarrio(args.zona) : undefined;
           let results = await searchProperties(embedding, {
             operacion: args.operacion,
-            tipo: args.tipo,
+            tipo: 'departamento', // Juejati works exclusively with apartments
             ambientes: args.ambientes,
             barrio: barrioNormalizado,
             presupuesto_max: args.presupuesto_max,
@@ -193,14 +196,15 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           if (results.length === 0 && args.zona) {
             results = await searchProperties(embedding, {
               operacion: args.operacion,
-              tipo: args.tipo,
+              tipo: 'departamento',
               ambientes: args.ambientes,
               presupuesto_max: args.presupuesto_max,
             });
           }
-          // Collect image URLs for attachments (max 3 to avoid spam)
+          // Collect image URLs for attachments — cap total across all tools at 3
           searchPerformed = true;
-          const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen).slice(0, 3);
+          const remaining = Math.max(0, 3 - collectedImages.length);
+          const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen).slice(0, remaining);
           console.log(`🔍 Tool results: ${results.length} properties, ${imgs.length} images: ${JSON.stringify(imgs)}`);
           collectedImages.push(...imgs);
           if (imgs.length > 0) {
@@ -219,29 +223,29 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
       }),
 
       fallback_zonaprop_scraper: tool({
-        description: 'Búsqueda externa en ZonaProp. Usar SOLO cuando search_internal_properties no devuelve resultados.',
+        description: 'Búsqueda en nuestra red de propiedades asociadas. Usar SOLO cuando search_internal_properties no devuelve resultados.',
         parameters: z.object({
           zona: z.string().optional(),
-          tipo: z.string().optional(),
           operacion: z.string().optional()
         }),
         execute: async (args) => {
           const raw = await searchZonaPropScraper({
             barrio: args.zona,
-            tipo: args.tipo,
+            tipo: 'departamento', // Juejati works exclusively with apartments
             operacion: args.operacion
           });
           // Scraper returns { properties: [...], html: '...' } or an array
           const properties: any[] = Array.isArray(raw) ? raw : (raw?.properties || []);
-          // Collect images and use rebrandedUrl instead of raw zonaprop link (max 3)
+          // Collect images — cap total across all tools at 3
           searchPerformed = true;
-          const imgs = properties.filter((r: any) => r.image).map((r: any) => r.image).slice(0, 3);
+          const remaining = Math.max(0, 3 - collectedImages.length);
+          const imgs = properties.filter((r: any) => r.image).map((r: any) => r.image).slice(0, remaining);
           collectedImages.push(...imgs);
           if (imgs.length > 0) {
             await saveContactImages(contactId, imgs);
           }
           // Build catalog URL so the agent can share a single link with all results
-          const catalogUrl = buildCatalogUrl({ tipo: args.tipo, operacion: args.operacion, barrio: args.zona });
+          const catalogUrl = buildCatalogUrl({ tipo: 'departamento', operacion: args.operacion, barrio: args.zona });
           // Map to cleaner format so agent never sees the raw zonaprop link
           return {
             properties: properties.map((r: any) => ({
@@ -262,12 +266,13 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         parameters: z.object({
           zona: z.string().optional().describe('Zona de interés del cliente'),
           presupuesto: z.number().optional().describe('Presupuesto en USD'),
-          tipo_propiedad: z.string().optional().describe('departamento, casa, local comercial'),
           ambientes: z.number().optional().describe('Cantidad de ambientes'),
           operacion: z.string().optional().describe('venta o alquiler'),
           propiedad_de_interes: z.string().optional().describe('Título o ID de propiedad que le interesó'),
           propiedad_tokko_id: z.number().optional().describe('Tokko ID de la propiedad de interés'),
           caracteristicas: z.string().optional().describe('Características deseadas por el cliente'),
+          forma_pago: z.enum(['contado', 'credito']).optional().describe('Forma de pago declarada: contado o credito'),
+          timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra: ahora (0-3 meses), 6_meses, o 1_anio'),
           score_lead: z.enum(['frio', 'tibio', 'caliente']).optional().describe('Score del lead: "frio" (solo pregunta), "tibio" (dio datos concretos de búsqueda), "caliente" (quiere visitar o comprar)'),
         }),
         execute: async (args) => {
@@ -275,7 +280,8 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
 
           if (args.zona) fields.push({ id: GHL_FIELD_IDS.zona, field_value: args.zona });
           if (args.presupuesto) fields.push({ id: GHL_FIELD_IDS.presupuesto_ia, field_value: args.presupuesto });
-          if (args.tipo_propiedad) fields.push({ id: GHL_FIELD_IDS.tipo_propiedad, field_value: args.tipo_propiedad });
+          // Always set tipo_propiedad = departamento — Juejati works exclusively with apartments
+          fields.push({ id: GHL_FIELD_IDS.tipo_propiedad, field_value: 'departamento' });
           if (args.ambientes) fields.push({ id: GHL_FIELD_IDS.ambientes, field_value: String(args.ambientes) });
           if (args.operacion) fields.push({ id: GHL_FIELD_IDS.operacion, field_value: args.operacion });
           if (args.propiedad_de_interes) fields.push({ id: GHL_FIELD_IDS.propiedad_de_interes, field_value: args.propiedad_de_interes });
@@ -286,6 +292,10 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           if (fields.length > 0) {
             await updateContactFields(contactId, fields);
           }
+          // Save forma_pago and timeline as GHL tags (no dedicated field IDs)
+          if (args.forma_pago) await addContactTag(contactId, `pago_${args.forma_pago}`);
+          if (args.timeline) await addContactTag(contactId, `timeline_${args.timeline}`);
+
           return { success: true, updated: args };
         }
       }),

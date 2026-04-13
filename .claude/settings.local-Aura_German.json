@@ -1,4 +1,5 @@
 {
+  "enableAllProjectMcpServers": true,
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
@@ -7,7 +8,9 @@
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
       "Bash(node -e ':*)",
-      "Read(//c/Users/germa/.claude/**)"
+      "Read(//c/Users/germa/.claude/**)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
