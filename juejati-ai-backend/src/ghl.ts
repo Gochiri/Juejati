@@ -86,8 +86,8 @@ async function getOrCreateConversation(contactId: string): Promise<{ id: string;
 
 export async function sendMessage(contactId: string, message: string, incomingType: string = 'WhatsApp', toNumber: string = '', attachments: string[] = []) {
   const { id: conversationId, channel } = await getOrCreateConversation(contactId);
-  const type = GHL_CHANNEL_MAP[channel] || 'SMS';
-  console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} type=${type}`);
+  const type = GHL_CHANNEL_MAP[incomingType] || GHL_CHANNEL_MAP[channel] || 'WhatsApp';
+  console.log(`📤 Sending via conversationId=${conversationId} channel=${channel} incomingType=${incomingType} type=${type}`);
 
   const payload: Record<string, any> = {
     type,
