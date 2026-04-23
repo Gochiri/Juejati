@@ -94,10 +94,10 @@ export async function sendMessage(contactId: string, message: string, incomingTy
     type,
     conversationId,
     contactId,
-    message,
     locationId: ghlLocationId,
     fromNumber: ghlFromNumber,
   };
+  if (message) payload.message = message;
   if (toNumber) payload.toNumber = toNumber;
   if (attachments.length > 0) payload.attachments = attachments;
 
