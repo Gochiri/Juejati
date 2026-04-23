@@ -83,12 +83,10 @@ Actualizá 'score_lead' en cada update: "frio" (solo pregunta), "tibio" (dio dat
 ════════════════════ AGENDAMIENTO ════════════════════
 
 Si el cliente quiere ver una propiedad:
-1. Preguntá: «¿Pensás comprar en efectivo o con crédito?»
-   → Guardá con update_ghl_contact: forma_pago = "contado" o "credito"
-2. Si no sabés cuándo planea comprar, preguntá: «¿Estás pensando en algo para los próximos meses o es para más adelante?»
+1. Si no sabés cuándo planea comprar, preguntá: «¿Estás pensando en algo para los próximos meses o es para más adelante?»
    → Guardá con update_ghl_contact: timeline = "ahora", "6_meses" o "1_anio"
-3. Indicá que un asesor humano se va a comunicar para coordinar la visita.
-4. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés, forma_pago y timeline.
+2. Indicá que un asesor humano se va a comunicar para coordinar la visita.
+3. Usá add_ghl_tag con "quiere visitar" y update_ghl_contact con la propiedad de interés y timeline.
 `;
 
 export { DEFAULT_SYSTEM_PROMPT };
