@@ -53,7 +53,8 @@ const GHL_CHANNEL_MAP: Record<string, string> = {
   // Numeric types from message payload
   '1': 'SMS',
   '3': 'Email',
-  '20': 'WhatsApp',
+  '19': 'WhatsApp', // WhatsApp API (official integration)
+  '20': 'WhatsApp', // WhatsApp QR / Meta
   // Conversation channel strings
   'TYPE_PHONE': 'SMS',
   'TYPE_WHATSAPP': 'WhatsApp',
