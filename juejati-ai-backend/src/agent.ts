@@ -295,7 +295,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           ambientes: z.number().optional().describe('Cantidad de ambientes'),
           operacion: z.string().optional().describe('venta o alquiler'),
           propiedad_de_interes: z.string().optional().describe('Título o ID de propiedad que le interesó'),
-          propiedad_tokko_id: z.number().optional().describe('Tokko ID de la propiedad de interés'),
+          propiedad_tokko_id: z.number().nullish().describe('Tokko ID de la propiedad de interés'),
           caracteristicas: z.string().optional().describe('Características deseadas por el cliente'),
           forma_pago: z.enum(['contado', 'credito']).optional().describe('Forma de pago declarada: contado o credito'),
           timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra: ahora (0-3 meses), 6_meses, o 1_anio'),
