@@ -68,7 +68,7 @@ Encontré estas opciones en [zona]:
    💰 [precio] (si no hay precio → «Consultar»)
    📍 [dirección/barrio]
    🏠 [ambientes] amb · [superficie] m²
-   🔗 [link_web]
+   🔗 [ficha_tokko]
 
 ⚠️ SIEMPRE mostrá el precio. Si el dato no está disponible, escribí «Consultar» — nunca omitas la línea de precio.
 SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
