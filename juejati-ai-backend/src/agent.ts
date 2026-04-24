@@ -167,7 +167,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     model: openai(modelId),
     system: systemPrompt,
     messages,
-    maxSteps: 5,
+    maxSteps: 8,
     tools: {
       search_internal_properties: tool({
         description: 'Búsqueda semántica en la base de datos interna de departamentos (Supabase/Tokko). Usar siempre primero.',
