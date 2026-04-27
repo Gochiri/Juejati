@@ -95,23 +95,10 @@ Solo guardás lo que el cliente dijo en esta conversación.
 Cuando el cliente dice "me interesa la X", "quiero ver la X", "me gusta la X":
 
 1. Identificá qué número eligió (1, 2, 3…).
-2. Buscá en los resultados de búsqueda de este turno la propiedad
-   con ese número. Extraé los valores EXACTOS:
-   - tokko_id del campo "tokko_id" (es un número grande, ej: 58558939 — NUNCA uses 1, 2 o 3)
-   - titulo del campo "titulo"
-   - precio del campo "precio"
-   - ubicacion del campo "direccion" o "barrio"
-   - dormitorios del campo "dormitorios"
-   - link del campo "ficha_tokko"
-3. Llamá update_ghl_contact con TODOS esos valores:
-   propiedad_de_interes=titulo, propiedad_tokko_id=tokko_id real,
-   titulo_propiedad, precio_propiedad, ubicacion_propiedad,
-   dormitorios, link_propiedad=ficha_tokko, score_lead="caliente"
-4. NO hagas una nueva búsqueda.
-5. Respondé con los datos que tenés + preguntá si quiere visitarla.
-
-⚠️ propiedad_tokko_id SIEMPRE es el valor del campo "tokko_id" del
-resultado — NUNCA el número de posición (1, 2, 3) en la lista.
+2. Llamá INMEDIATAMENTE 'seleccionar_propiedad' con ese número.
+   El sistema guarda todos los datos automáticamente.
+3. NO hagas una nueva búsqueda.
+4. Confirmá al cliente y preguntá si quiere coordinar la visita.
 
 NUNCA uses fallback_zonaprop_scraper para "más información".
 
@@ -221,6 +208,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
 
   const collectedCards: PropertyCard[] = [];
   let searchPerformed = false;
+  let lastSearchResults: any[] = [];
   const systemPrompt = await getSystemPrompt();
   const modelId = await getModelId();
 
@@ -262,6 +250,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           }
           // Build property cards — cap at 3 total across all tool calls
           searchPerformed = true;
+          lastSearchResults = results; // store for seleccionar_propiedad tool
           const remaining = Math.max(0, 3 - collectedCards.length);
           const cards: PropertyCard[] = results.slice(0, remaining).map((r: any) => ({
             url: r.imagen || undefined,
@@ -385,6 +374,37 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         execute: async (args) => {
           await addContactTag(contactId, args.tag);
           return { success: true, tag: args.tag };
+        }
+      }),
+
+      seleccionar_propiedad: tool({
+        description: 'Llamar cuando el cliente elige una propiedad de la lista (ej: "me interesa la primera", "quiero ver la 2"). Guarda automáticamente todos los datos de esa propiedad en GHL.',
+        parameters: z.object({
+          numero: z.number().describe('Posición en la lista que eligió el cliente: 1, 2, 3…'),
+          timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra'),
+        }),
+        execute: async (args) => {
+          const prop = lastSearchResults[args.numero - 1];
+          if (!prop) return { error: `No hay propiedad número ${args.numero} en los resultados actuales.` };
+
+          const fields: { id: string; field_value: any }[] = [
+            { id: GHL_FIELD_IDS.propiedad_de_interes, field_value: prop.titulo },
+            { id: GHL_FIELD_IDS.propiedad_tokko_id, field_value: prop.tokko_id },
+            { id: GHL_FIELD_IDS.titulo_propiedad, field_value: prop.titulo },
+            { id: GHL_FIELD_IDS.score_lead, field_value: 'caliente' },
+          ];
+          if (prop.precio) fields.push({ id: GHL_FIELD_IDS.precio_propiedad, field_value: prop.precio });
+          const ubicacion = prop.direccion || prop.barrio;
+          if (ubicacion) fields.push({ id: GHL_FIELD_IDS.ubicacion_propiedad, field_value: ubicacion });
+          if (prop.dormitorios) fields.push({ id: GHL_FIELD_IDS.dormitorios, field_value: prop.dormitorios });
+          if (prop.ficha_tokko) fields.push({ id: GHL_FIELD_IDS.link_propiedad, field_value: prop.ficha_tokko });
+
+          await updateContactFields(contactId, fields);
+          await addContactTag(contactId, 'quiere_visitar');
+          if (args.timeline) await addContactTag(contactId, `timeline_${args.timeline}`);
+
+          console.log(`✅ seleccionar_propiedad: tokko_id=${prop.tokko_id}, titulo="${prop.titulo}"`);
+          return { success: true, tokko_id: prop.tokko_id, titulo: prop.titulo };
         }
       })
     }
