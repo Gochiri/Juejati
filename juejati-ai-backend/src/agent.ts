@@ -123,6 +123,25 @@ async function getModelId(): Promise<string> {
   return model || 'gpt-4.1-mini';
 }
 
+function stripPropertyListings(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inListing = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Detect start of a numbered property item: "1) **Title**"
+    if (/^\d+\)\s+\*\*/.test(trimmed)) { inListing = true; continue; }
+    // Skip property detail lines while inside a listing block
+    if (inListing && /^[💰📍🏠🔗]/.test(trimmed)) continue;
+    if (inListing && trimmed === '') continue;
+    inListing = false;
+    result.push(line);
+  }
+
+  return result.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function buildInternalCaption(r: any): string {
   const precio = r.precio
     ? `${r.moneda || 'USD'} ${Number(r.precio).toLocaleString('es-AR')}`
@@ -418,9 +437,6 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     console.log(`💰 Tokens: ${usage.promptTokens}+${usage.completionTokens} = ${usage.totalTokens} (~$${cost.toFixed(4)})`);
   }
 
-  // Strip any inline image markdown the model may have included
-  const cleanText = result.text.replace(/!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '').trim();
-
   // Fall back to cached cards if a search was performed but yielded no cards
   let cards = collectedCards;
   if (searchPerformed && cards.length === 0) {
@@ -428,6 +444,10 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     console.log(`📦 Using cached cards for ${contactId}: ${cards.length}`);
   }
   console.log(`📤 Returning ${cards.length} cards for ${contactId}`);
+
+  // Strip inline image markdown and, when cards were collected, remove duplicate property listings
+  let cleanText = result.text.replace(/!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '').trim();
+  if (cards.length > 0) cleanText = stripPropertyListings(cleanText);
 
   return { text: cleanText, images: cards };
 }
