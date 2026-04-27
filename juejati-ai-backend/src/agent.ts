@@ -22,6 +22,7 @@ const GHL_FIELD_IDS = {
   precio_propiedad: 'oMgcrl5b9LY1WOCVLiFI',
   ubicacion_propiedad: 'XJvbVGNyvhnghesdLIYd',
   score_lead: 'zLRaEQ5pm9fWvKJsnoIo',
+  link_propiedad: 'XXEy7AlJmE9PJu1bOQKs',
 } as const;
 
 const DEFAULT_SYSTEM_PROMPT = `
@@ -102,7 +103,10 @@ la X", "quiero info de esa", "más información"):
 4. Si el cliente pide FOTO específicamente → ahí sí llamá
    search_internal_properties con el tokko_id que ya guardaste.
 5. Si el cliente quiere visitarla → add_ghl_tag("quiere visitar")
-   + update_ghl_contact con propiedad_de_interes y timeline.
+   + update_ghl_contact con TODOS los datos de la propiedad:
+     propiedad_de_interes, propiedad_tokko_id, titulo_propiedad,
+     precio_propiedad, ubicacion_propiedad, dormitorios,
+     link_propiedad (ficha_tokko), score_lead="caliente", timeline.
 
 NUNCA uses fallback_zonaprop_scraper para "más información" —
 ese tool es solo para cuando no hay resultados internos en la
@@ -300,6 +304,12 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           forma_pago: z.enum(['contado', 'credito']).optional().describe('Forma de pago declarada: contado o credito'),
           timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra: ahora (0-3 meses), 6_meses, o 1_anio'),
           score_lead: z.enum(['frio', 'tibio', 'caliente']).optional().describe('Score del lead: "frio" (solo pregunta), "tibio" (dio datos concretos de búsqueda), "caliente" (quiere visitar o comprar)'),
+          titulo_propiedad: z.string().optional().describe('Título de la propiedad seleccionada'),
+          precio_propiedad: z.number().optional().describe('Precio en USD de la propiedad seleccionada'),
+          ubicacion_propiedad: z.string().optional().describe('Dirección o ubicación de la propiedad seleccionada'),
+          dormitorios: z.number().optional().describe('Cantidad de dormitorios de la propiedad seleccionada'),
+          link_propiedad: z.string().optional().describe('URL de la ficha de la propiedad seleccionada (ficha_tokko)'),
+          ultima_propiedad_vista: z.string().optional().describe('Título de la última propiedad consultada por el cliente'),
         }),
         execute: async (args) => {
           const fields: { id: string; field_value: any }[] = [];
@@ -314,6 +324,12 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           if (args.propiedad_tokko_id) fields.push({ id: GHL_FIELD_IDS.propiedad_tokko_id, field_value: args.propiedad_tokko_id });
           if (args.caracteristicas) fields.push({ id: GHL_FIELD_IDS.caracteristicas_deseadas, field_value: args.caracteristicas });
           if (args.score_lead) fields.push({ id: GHL_FIELD_IDS.score_lead, field_value: args.score_lead });
+          if (args.titulo_propiedad) fields.push({ id: GHL_FIELD_IDS.titulo_propiedad, field_value: args.titulo_propiedad });
+          if (args.precio_propiedad) fields.push({ id: GHL_FIELD_IDS.precio_propiedad, field_value: args.precio_propiedad });
+          if (args.ubicacion_propiedad) fields.push({ id: GHL_FIELD_IDS.ubicacion_propiedad, field_value: args.ubicacion_propiedad });
+          if (args.dormitorios) fields.push({ id: GHL_FIELD_IDS.dormitorios, field_value: args.dormitorios });
+          if (args.link_propiedad) fields.push({ id: GHL_FIELD_IDS.link_propiedad, field_value: args.link_propiedad });
+          if (args.ultima_propiedad_vista) fields.push({ id: GHL_FIELD_IDS.ultima_propiedad_vista, field_value: args.ultima_propiedad_vista });
 
           if (fields.length > 0) {
             await updateContactFields(contactId, fields);
