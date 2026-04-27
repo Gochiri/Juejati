@@ -152,6 +152,7 @@ export async function markInactiveExcept(activeTokkoIds: number[]) {
 export interface PropertyCard {
   url?: string;
   caption: string;
+  data?: Record<string, any>; // raw property row — persisted for cross-turn seleccionar_propiedad
 }
 
 export async function saveContactImages(contactId: string, cards: PropertyCard[]) {

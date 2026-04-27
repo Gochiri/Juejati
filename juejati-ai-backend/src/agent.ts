@@ -274,6 +274,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           const cards: PropertyCard[] = results.slice(0, remaining).map((r: any) => ({
             url: r.imagen || undefined,
             caption: buildInternalCaption(r),
+            data: r,
           }));
           console.log(`🔍 Tool results: ${results.length} properties, ${cards.length} cards`);
           collectedCards.push(...cards);
@@ -337,7 +338,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
       }),
 
       update_ghl_contact: tool({
-        description: 'Actualiza los campos del contacto en el CRM cuando obtenés nueva información del cliente.',
+        description: 'Actualiza campos del contacto en el CRM (zona, presupuesto, ambientes, etc.). ⚠️ Para cuando el cliente ELIGE una propiedad usar "seleccionar_propiedad", NO este tool.',
         parameters: z.object({
           zona: z.string().optional().describe('Zona de interés del cliente'),
           presupuesto: z.number().optional().describe('Presupuesto en USD'),
@@ -397,14 +398,19 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
       }),
 
       seleccionar_propiedad: tool({
-        description: 'Llamar cuando el cliente elige una propiedad de la lista (ej: "me interesa la primera", "quiero ver la 2"). Guarda automáticamente todos los datos de esa propiedad en GHL.',
+        description: 'USAR SIEMPRE cuando el cliente elige una propiedad ("me gusta la X", "quiero ver la X", "la primera", "la 2", cualquier número o referencia a una propiedad mostrada). Guarda automáticamente TODOS los datos en GHL. NO uses update_ghl_contact para esto.',
         parameters: z.object({
           numero: z.number().describe('Posición en la lista que eligió el cliente: 1, 2, 3…'),
           timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra'),
         }),
         execute: async (args) => {
-          const prop = lastSearchResults[args.numero - 1];
-          if (!prop) return { error: `No hay propiedad número ${args.numero} en los resultados actuales.` };
+          // Try in-memory first (same turn), then fall back to persisted cache (cross-turn)
+          let prop = lastSearchResults[args.numero - 1];
+          if (!prop) {
+            const cached = await getContactImages(contactId);
+            prop = cached[args.numero - 1]?.data;
+          }
+          if (!prop) return { error: `No hay propiedad número ${args.numero} en los resultados. Pedile al cliente que busque de nuevo.` };
 
           const fields: { id: string; field_value: any }[] = [
             { id: GHL_FIELD_IDS.propiedad_de_interes, field_value: prop.titulo },
