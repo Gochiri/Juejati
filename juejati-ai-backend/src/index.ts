@@ -66,7 +66,17 @@ app.post('/webhook/ghl', (req, res) => {
 
       console.log(`🤖 Running agent for ${contactId}...`);
       const { text: agentResponse, images } = await runAgent(contactId, history, messageBody);
-      console.log(`🖼️ Images extracted: ${images.length} - ${JSON.stringify(images)}`);
+      console.log(`🃏 Cards to send: ${images.length}`);
+
+      // Send property cards first (image + caption), then the follow-up question
+      for (const card of images) {
+        try {
+          await sendMessage(contactId, card.caption, channel, phone, card.url ? [card.url] : []);
+          console.log(`🃏 Sent card: ${card.url || '(no image)'}`);
+        } catch (cardErr: any) {
+          console.error(`❌ Failed to send card: ${cardErr.message}`, cardErr.stack);
+        }
+      }
 
       if (agentResponse.trim()) {
         await sendMessage(contactId, agentResponse, channel, phone);
@@ -74,16 +84,7 @@ app.post('/webhook/ghl', (req, res) => {
         console.warn(`⚠️ Agent returned empty text for ${contactId}, skipping text message`);
       }
 
-      for (const imageUrl of images) {
-        try {
-          await sendMessage(contactId, '', channel, phone, [imageUrl]);
-          console.log(`🖼️ Sent image: ${imageUrl}`);
-        } catch (imgErr: any) {
-          console.error(`❌ Failed to send image ${imageUrl}: ${imgErr.message}`, imgErr.stack);
-        }
-      }
-
-      logMessage(contactId, 'outbound', agentResponse, channel, images).catch(() => {});
+      logMessage(contactId, 'outbound', agentResponse, channel, images.map(c => c.url).filter(Boolean) as string[]).catch(() => {});
       console.log(`✅ Successfully replied to ${contactId} via ${channel}`);
     } catch (err: any) {
       console.error('❌ Error in webhook background processing:', err.message, err.stack);

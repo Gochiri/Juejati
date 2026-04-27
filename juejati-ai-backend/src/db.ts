@@ -149,7 +149,12 @@ export async function markInactiveExcept(activeTokkoIds: number[]) {
   return queryDatabase(sql, [activeTokkoIds]);
 }
 
-export async function saveContactImages(contactId: string, images: string[]) {
+export interface PropertyCard {
+  url?: string;
+  caption: string;
+}
+
+export async function saveContactImages(contactId: string, cards: PropertyCard[]) {
   const sql = `
     INSERT INTO contact_last_images (contact_id, images, updated_at)
     VALUES ($1, $2::jsonb, NOW())
@@ -157,11 +162,18 @@ export async function saveContactImages(contactId: string, images: string[]) {
       images = EXCLUDED.images,
       updated_at = NOW()
   `;
-  return queryDatabase(sql, [contactId, JSON.stringify(images)]);
+  return queryDatabase(sql, [contactId, JSON.stringify(cards)]);
 }
 
-export async function getContactImages(contactId: string): Promise<string[]> {
+export async function getContactImages(contactId: string): Promise<PropertyCard[]> {
   const sql = `SELECT images FROM contact_last_images WHERE contact_id = $1`;
   const rows = await queryDatabase(sql, [contactId]);
-  return rows.length > 0 ? (rows[0].images as string[]) : [];
+  if (rows.length === 0) return [];
+  const images = rows[0].images;
+  if (!Array.isArray(images) || images.length === 0) return [];
+  // Backward compat: old cache stored string[], new format stores PropertyCard[]
+  if (typeof images[0] === 'string') {
+    return (images as string[]).map(url => ({ url, caption: '' }));
+  }
+  return images as PropertyCard[];
 }

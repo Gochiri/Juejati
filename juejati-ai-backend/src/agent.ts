@@ -1,7 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { generateText, tool, CoreMessage, embed } from 'ai';
 import { z } from 'zod';
-import { searchProperties, saveContactImages, getContactImages } from './db.js';
+import { searchProperties, saveContactImages, getContactImages, PropertyCard } from './db.js';
 import { searchZonaPropScraper, buildCatalogUrl } from './scraper.js';
 import { addContactTag, updateContactFields } from './ghl.js';
 import { getConfig, logUsage } from './admin-db.js';
@@ -63,16 +63,15 @@ Cuando tengas zona, ambientes y presupuesto:
 
 ════════════════════ FORMATO DE RESULTADOS ════════════════════
 
-Encontré estas opciones en [zona]:
+NUNCA listes las propiedades en tu respuesta — el sistema las envía
+automáticamente como tarjetas individuales (imagen + datos) por WhatsApp.
 
-1) **[Título]**
-   💰 [precio] (si no hay precio → «Consultar»)
-   📍 [dirección/barrio]
-   🏠 [ambientes] amb · [superficie] m²
-   🔗 [ficha_tokko]
+Cuando tengas resultados de búsqueda:
+- Solo generá una pregunta de seguimiento contextual.
+  Ej: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
+- Si no hay resultados, informá al cliente que un asesor se comunicará.
 
-⚠️ SIEMPRE mostrá el precio. Si el dato no está disponible, escribí «Consultar» — nunca omitas la línea de precio.
-SIEMPRE terminá con: «¿Te interesa alguna? ¿Querés que busque en otras zonas?»
+⚠️ No incluyas títulos, precios ni links en tu respuesta — van en las tarjetas.
 
 ════════════════════ ACTUALIZACIÓN DE DATOS ════════════════════
 
@@ -133,6 +132,32 @@ async function getModelId(): Promise<string> {
   return model || 'gpt-4.1-mini';
 }
 
+function buildInternalCaption(r: any): string {
+  const precio = r.precio
+    ? `${r.moneda || 'USD'} ${Number(r.precio).toLocaleString('es-AR')}`
+    : 'Consultar';
+  const amb = r.ambientes ? `${r.ambientes} amb` : '';
+  const sup = r.superficie ? `${r.superficie} m²` : '';
+  const detalle = [amb, sup].filter(Boolean).join(' · ');
+  return [
+    `*${r.titulo}*`,
+    `💰 ${precio}`,
+    (r.direccion || r.barrio) ? `📍 ${r.direccion || r.barrio}` : '',
+    detalle ? `🏠 ${detalle}` : '',
+    r.ficha_tokko ? `🔗 ${r.ficha_tokko}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function buildScraperCaption(r: any): string {
+  return [
+    `*${r.title || r.titulo || 'Propiedad'}*`,
+    (r.price || r.precio) ? `💰 ${r.price || r.precio}` : '',
+    (r.location || r.ubicacion) ? `📍 ${r.location || r.ubicacion}` : '',
+    (r.features || r.caracteristicas) ? `🏠 ${r.features || r.caracteristicas}` : '',
+    (r.rebrandedUrl || r.link_web) ? `🔗 ${r.rebrandedUrl || r.link_web}` : '',
+  ].filter(Boolean).join('\n');
+}
+
 // Mapa de sub-barrios → distrito Tokko
 // Tokko guarda barrios a nivel distrito, no sub-barrios
 const BARRIO_ALIASES: Record<string, string> = {
@@ -184,13 +209,13 @@ async function getEmbedding(text: string): Promise<number[]> {
   return embedding;
 }
 
-export async function runAgent(contactId: string, history: CoreMessage[], userMessage: string): Promise<{ text: string; images: string[] }> {
+export async function runAgent(contactId: string, history: CoreMessage[], userMessage: string): Promise<{ text: string; images: PropertyCard[] }> {
   const messages: CoreMessage[] = [
     ...history,
     { role: 'user', content: userMessage }
   ];
 
-  const collectedImages: string[] = [];
+  const collectedCards: PropertyCard[] = [];
   let searchPerformed = false;
   const systemPrompt = await getSystemPrompt();
   const modelId = await getModelId();
@@ -231,22 +256,25 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
               presupuesto_max: args.presupuesto_max,
             });
           }
-          // Collect image URLs for attachments — cap total across all tools at 3
+          // Build property cards — cap at 3 total across all tool calls
           searchPerformed = true;
-          const remaining = Math.max(0, 3 - collectedImages.length);
-          const imgs = results.filter((r: any) => r.imagen).map((r: any) => r.imagen).slice(0, remaining);
-          console.log(`🔍 Tool results: ${results.length} properties, ${imgs.length} images: ${JSON.stringify(imgs)}`);
-          collectedImages.push(...imgs);
-          if (imgs.length > 0) {
-            await saveContactImages(contactId, imgs);
+          const remaining = Math.max(0, 3 - collectedCards.length);
+          const cards: PropertyCard[] = results.slice(0, remaining).map((r: any) => ({
+            url: r.imagen || undefined,
+            caption: buildInternalCaption(r),
+          }));
+          console.log(`🔍 Tool results: ${results.length} properties, ${cards.length} cards`);
+          collectedCards.push(...cards);
+          if (cards.length > 0) {
+            await saveContactImages(contactId, cards);
           }
           return {
             properties: results,
             _zona_note: !zonaExacta && args.zona
               ? `No hay propiedades exactas en "${args.zona}" en nuestra base. Estos son los más cercanos disponibles — aclaráselo al cliente y ofrecé buscar en zonas alternativas.`
               : undefined,
-            _system_note: imgs.length > 0
-              ? `${imgs.length} foto(s) se enviarán automáticamente al cliente. NO digas que no podés enviar fotos.`
+            _system_note: cards.length > 0
+              ? `${cards.length} tarjeta(s) con foto y datos se enviarán automáticamente al cliente. NO digas que no podés enviar fotos.`
               : 'No se encontraron fotos para estas propiedades.'
           };
         }
@@ -266,13 +294,16 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           });
           // Scraper returns { properties: [...], html: '...' } or an array
           const properties: any[] = Array.isArray(raw) ? raw : (raw?.properties || []);
-          // Collect images — cap total across all tools at 3
+          // Build property cards — cap at 3 total across all tool calls
           searchPerformed = true;
-          const remaining = Math.max(0, 3 - collectedImages.length);
-          const imgs = properties.filter((r: any) => r.image).map((r: any) => r.image).slice(0, remaining);
-          collectedImages.push(...imgs);
-          if (imgs.length > 0) {
-            await saveContactImages(contactId, imgs);
+          const remaining = Math.max(0, 3 - collectedCards.length);
+          const cards: PropertyCard[] = properties.slice(0, remaining).map((r: any) => ({
+            url: r.image || undefined,
+            caption: buildScraperCaption(r),
+          }));
+          collectedCards.push(...cards);
+          if (cards.length > 0) {
+            await saveContactImages(contactId, cards);
           }
           // Build catalog URL so the agent can share a single link with all results
           const catalogUrl = buildCatalogUrl({ tipo: 'departamento', operacion: args.operacion, barrio: args.zona });
@@ -361,24 +392,18 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
     console.log(`💰 Tokens: ${usage.promptTokens}+${usage.completionTokens} = ${usage.totalTokens} (~$${cost.toFixed(4)})`);
   }
 
-  // Extract image URLs from markdown patterns in text: ![Foto](url) or ![Imagen](url)
-  const inlineImageRegex = /!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\((https?:\/\/[^)]+)\)/g;
-  let match;
-  while ((match = inlineImageRegex.exec(result.text)) !== null) {
-    if (!collectedImages.includes(match[1])) collectedImages.push(match[1]);
-  }
-  // Strip inline image markdown from text
+  // Strip any inline image markdown the model may have included
   const cleanText = result.text.replace(/!\[(?:Foto|Imagen|foto|imagen)[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '').trim();
 
-  // Only return cached images if a search was performed this turn but yielded no images
-  let images = collectedImages;
-  if (searchPerformed && images.length === 0) {
-    images = await getContactImages(contactId);
-    console.log(`📦 Using cached images for ${contactId}: ${images.length}`);
+  // Fall back to cached cards if a search was performed but yielded no cards
+  let cards = collectedCards;
+  if (searchPerformed && cards.length === 0) {
+    cards = await getContactImages(contactId);
+    console.log(`📦 Using cached cards for ${contactId}: ${cards.length}`);
   }
-  console.log(`📤 Returning ${images.length} images for ${contactId}`);
+  console.log(`📤 Returning ${cards.length} cards for ${contactId}`);
 
-  return { text: cleanText, images };
+  return { text: cleanText, images: cards };
 }
 
 export async function handleStaleOpportunity(contactId: string, history: CoreMessage[]): Promise<{ text: string }> {
