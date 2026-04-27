@@ -92,24 +92,28 @@ Solo guardás lo que el cliente dijo en esta conversación.
 
 ════════════════════ PROPIEDAD SELECCIONADA ════════════════════
 
-Cuando el cliente eligió una propiedad específica (dijo "me gusta
-la X", "quiero info de esa", "más información"):
+Cuando el cliente dice "me interesa la X", "quiero ver la X", "me gusta la X":
 
-1. NO hagas una nueva búsqueda.
-2. Usá los datos que ya tenés en la conversación: título, precio,
-   dirección, superficie, link.
-3. Respondé con lo que sabés de esa propiedad.
-4. Si el cliente pide FOTO específicamente → ahí sí llamá
-   search_internal_properties con el tokko_id que ya guardaste.
-5. Si el cliente quiere visitarla → add_ghl_tag("quiere visitar")
-   + update_ghl_contact con TODOS los datos de la propiedad:
-     propiedad_de_interes, propiedad_tokko_id, titulo_propiedad,
-     precio_propiedad, ubicacion_propiedad, dormitorios,
-     link_propiedad (ficha_tokko), score_lead="caliente", timeline.
+1. Identificá qué número eligió (1, 2, 3…).
+2. Buscá en los resultados de búsqueda de este turno la propiedad
+   con ese número. Extraé los valores EXACTOS:
+   - tokko_id del campo "tokko_id" (es un número grande, ej: 58558939 — NUNCA uses 1, 2 o 3)
+   - titulo del campo "titulo"
+   - precio del campo "precio"
+   - ubicacion del campo "direccion" o "barrio"
+   - dormitorios del campo "dormitorios"
+   - link del campo "ficha_tokko"
+3. Llamá update_ghl_contact con TODOS esos valores:
+   propiedad_de_interes=titulo, propiedad_tokko_id=tokko_id real,
+   titulo_propiedad, precio_propiedad, ubicacion_propiedad,
+   dormitorios, link_propiedad=ficha_tokko, score_lead="caliente"
+4. NO hagas una nueva búsqueda.
+5. Respondé con los datos que tenés + preguntá si quiere visitarla.
 
-NUNCA uses fallback_zonaprop_scraper para "más información" —
-ese tool es solo para cuando no hay resultados internos en la
-búsqueda inicial.
+⚠️ propiedad_tokko_id SIEMPRE es el valor del campo "tokko_id" del
+resultado — NUNCA el número de posición (1, 2, 3) en la lista.
+
+NUNCA uses fallback_zonaprop_scraper para "más información".
 
 ════════════════════ AGENDAMIENTO ════════════════════
 
@@ -268,8 +272,10 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           if (cards.length > 0) {
             await saveContactImages(contactId, cards);
           }
+          // Number results explicitly so the model maps "la primera" to the correct tokko_id
+          const numberedResults = results.map((r: any, i: number) => ({ _numero: i + 1, ...r }));
           return {
-            properties: results,
+            properties: numberedResults,
             _zona_note: !zonaExacta && args.zona
               ? `No hay propiedades exactas en "${args.zona}" en nuestra base. Estos son los más cercanos disponibles — aclaráselo al cliente y ofrecé buscar en zonas alternativas.`
               : undefined,
