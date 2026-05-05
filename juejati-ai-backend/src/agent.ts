@@ -255,24 +255,14 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         execute: async (args) => {
           const embedding = await getEmbedding(args.query_semantica);
           const barrioNormalizado = args.zona ? normalizarBarrio(args.zona) : undefined;
-          let results = await searchProperties(embedding, {
+          const results = await searchProperties(embedding, {
             operacion: args.operacion,
             tipo: 'departamento', // Juejati works exclusively with apartments
             ambientes: args.ambientes,
             barrio: barrioNormalizado,
             presupuesto_max: args.presupuesto_max,
           });
-          // If barrio filter returned nothing, retry without it — Tokko may store
-          // the district name instead of the neighborhood (e.g. "Almagro" for "Abasto")
-          let zonaExacta = results.length > 0;
-          if (results.length === 0 && args.zona) {
-            results = await searchProperties(embedding, {
-              operacion: args.operacion,
-              tipo: 'departamento',
-              ambientes: args.ambientes,
-              presupuesto_max: args.presupuesto_max,
-            });
-          }
+          const zonaExacta = results.length > 0;
           // Build property cards — cap at 3 total across all tool calls
           searchPerformed = true;
           lastSearchResults = results; // store for seleccionar_propiedad tool
@@ -292,7 +282,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
           return {
             properties: numberedResults,
             _zona_note: !zonaExacta && args.zona
-              ? `No hay propiedades exactas en "${args.zona}" en nuestra base. Estos son los más cercanos disponibles — aclaráselo al cliente y ofrecé buscar en zonas alternativas.`
+              ? `No hay propiedades en nuestra base para "${args.zona}". Usá fallback_zonaprop_scraper con zona="${args.zona}" para buscar en esa zona. NO mostrés estas propiedades al cliente.`
               : undefined,
             _system_note: cards.length > 0
               ? `${cards.length} tarjeta(s) con foto y datos se enviarán automáticamente al cliente. NO digas que no podés enviar fotos.`
