@@ -248,8 +248,8 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         parameters: z.object({
           zona: z.string().optional().describe('Barrio o zona. Ej: Palermo, Recoleta'),
           operacion: z.string().optional().describe('venta o alquiler'),
-          ambientes: z.number().optional().describe('Cantidad de ambientes'),
-          presupuesto_max: z.number().optional().describe('Presupuesto máximo en USD'),
+          ambientes: z.coerce.number().optional().describe('Cantidad de ambientes'),
+          presupuesto_max: z.coerce.number().optional().describe('Presupuesto máximo en USD'),
           query_semantica: z.string().describe('Frase natural de búsqueda. Ej: Departamento luminoso con balcón en Palermo')
         }),
         execute: async (args) => {
@@ -337,19 +337,19 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         description: 'Actualiza campos del contacto en el CRM (zona, presupuesto, ambientes, etc.). ⚠️ Para cuando el cliente ELIGE una propiedad usar "seleccionar_propiedad", NO este tool.',
         parameters: z.object({
           zona: z.string().optional().describe('Zona de interés del cliente'),
-          presupuesto: z.number().optional().describe('Presupuesto en USD'),
-          ambientes: z.number().optional().describe('Cantidad de ambientes'),
+          presupuesto: z.coerce.number().optional().describe('Presupuesto en USD'),
+          ambientes: z.coerce.number().optional().describe('Cantidad de ambientes'),
           operacion: z.string().optional().describe('venta o alquiler'),
           propiedad_de_interes: z.string().optional().describe('Título o ID de propiedad que le interesó'),
-          propiedad_tokko_id: z.number().nullish().describe('Tokko ID de la propiedad de interés'),
+          propiedad_tokko_id: z.coerce.number().nullish().describe('Tokko ID de la propiedad de interés'),
           caracteristicas: z.string().optional().describe('Características deseadas por el cliente'),
           forma_pago: z.enum(['contado', 'credito']).optional().describe('Forma de pago declarada: contado o credito'),
           timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra: ahora (0-3 meses), 6_meses, o 1_anio'),
           score_lead: z.enum(['frio', 'tibio', 'caliente']).optional().describe('Score del lead: "frio" (solo pregunta), "tibio" (dio datos concretos de búsqueda), "caliente" (quiere visitar o comprar)'),
           titulo_propiedad: z.string().optional().describe('Título de la propiedad seleccionada'),
-          precio_propiedad: z.number().optional().describe('Precio en USD de la propiedad seleccionada'),
+          precio_propiedad: z.coerce.number().optional().describe('Precio en USD de la propiedad seleccionada'),
           ubicacion_propiedad: z.string().optional().describe('Dirección o ubicación de la propiedad seleccionada'),
-          dormitorios: z.number().optional().describe('Cantidad de dormitorios de la propiedad seleccionada'),
+          dormitorios: z.coerce.number().optional().describe('Cantidad de dormitorios de la propiedad seleccionada'),
           link_propiedad: z.string().optional().describe('URL de la ficha de la propiedad seleccionada (ficha_tokko)'),
           ultima_propiedad_vista: z.string().optional().describe('Título de la última propiedad consultada por el cliente'),
         }),
@@ -396,7 +396,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
       seleccionar_propiedad: tool({
         description: 'USAR SIEMPRE cuando el cliente elige una propiedad ("me gusta la X", "quiero ver la X", "la primera", "la 2", cualquier número o referencia a una propiedad mostrada). Guarda automáticamente TODOS los datos en GHL. NO uses update_ghl_contact para esto.',
         parameters: z.object({
-          numero: z.number().describe('Posición en la lista que eligió el cliente: 1, 2, 3…'),
+          numero: z.coerce.number().describe('Posición en la lista que eligió el cliente: 1, 2, 3…'),
           timeline: z.enum(['ahora', '6_meses', '1_anio']).optional().describe('Urgencia de compra'),
         }),
         execute: async (args) => {
