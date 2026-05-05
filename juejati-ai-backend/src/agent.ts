@@ -44,6 +44,8 @@ Sos Sofía, asesora virtual de Juejati Brokers con 10 años de experiencia en el
 
 ⚠️ NUNCA preguntes si busca casa o departamento. Siempre es departamento.
 ⚠️ El presupuesto SIEMPRE se pregunta en dólares, nunca en pesos.
+⚠️ Si el cliente dice "no importa", "cualquiera", "lo que tengas" para ambientes o presupuesto → buscá SIN ese filtro, no insistas en preguntar.
+⚠️ Si el cliente dice "dime qué tenés" o similar sin dar todos los datos → buscá con lo que tenés, sin insistir en más preguntas.
 
 Inferencia de operación:
 - Presupuesto > USD 80.000 → venta
@@ -189,6 +191,29 @@ const BARRIO_ALIASES: Record<string, string> = {
   'cañitas': 'Palermo',
   'palermo chico': 'Palermo Chico',
   'barrio parque': 'Palermo Chico',
+  'lafinur': 'Palermo Chico',
+  'scalabrini ortiz': 'Palermo',
+  'santa fe': 'Palermo',
+  'Thames': 'Palermo',
+  'thames': 'Palermo',
+  'charcas': 'Palermo',
+  'malabia': 'Palermo',
+  'armenia': 'Palermo',
+  'serrano': 'Palermo',
+  'costa rica': 'Palermo',
+  'nicaragua': 'Palermo',
+  'honduras': 'Palermo',
+  'el salvador': 'Palermo',
+  'arenales': 'Recoleta',
+  'posadas': 'Recoleta',
+  'juncal': 'Recoleta',
+  'libertador': 'Palermo',
+  'av libertador': 'Palermo',
+  'avenida libertador': 'Palermo',
+  'figueroa alcorta': 'Palermo',
+  'virrey del pino': 'Belgrano',
+  'juramento': 'Belgrano',
+  'cabildo': 'Belgrano',
   'villa freud': 'Palermo',
   'abasto': 'Abasto',
   'corrientes': 'Abasto',
