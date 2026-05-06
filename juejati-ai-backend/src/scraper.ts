@@ -5,13 +5,20 @@ dotenv.config();
 const SCRAPER_API_URL = process.env.SCRAPER_API_URL || 'http://zonaprop-scraper:3000/api/search';
 const SCRAPER_PUBLIC_URL = process.env.SCRAPER_PUBLIC_URL || 'https://catalogo.korvance.com';
 
+function parseUsdPrice(priceStr: string): number | null {
+  if (!priceStr) return null;
+  const match = priceStr.match(/USD\s*([\d.]+)/i);
+  if (!match || !match[1]) return null;
+  return parseInt(match[1].replace(/\./g, ''), 10);
+}
+
 function ambientesToZonapropString(n: number): string {
   if (n <= 1) return 'monoambiente';
   if (n >= 5) return 'mas-de-4-ambientes';
   return `${n}-ambientes`;
 }
 
-export async function searchZonaPropScraper(filters: { tipo?: string, operacion?: string, barrio?: string, ambientes?: number, presupuesto?: number }) {
+export async function searchZonaPropScraper(filters: { tipo?: string, operacion?: string, barrio?: string, ambientes?: number, presupuesto?: number }): Promise<any> {
   const scraperFilters: Record<string, string> = {};
   if (filters.tipo) scraperFilters.tipo = filters.tipo;
   if (filters.operacion) scraperFilters.operacion = filters.operacion;
@@ -35,7 +42,19 @@ export async function searchZonaPropScraper(filters: { tipo?: string, operacion?
     }
 
     const json = await res.json();
-    return json.success ? json.data : [];
+    let results: any[] = json.success ? json.data : [];
+
+    if (filters.presupuesto && Array.isArray(results)) {
+      const minPrice = filters.presupuesto * 0.9;
+      const maxPrice = filters.presupuesto * 1.1;
+      results = results.filter((r: any) => {
+        const price = parseUsdPrice(r.price);
+        if (price === null) return true;
+        return price >= minPrice && price <= maxPrice;
+      });
+    }
+
+    return results;
   } catch (err) {
     console.error('Failed to run fallback scraper:', err);
     return [];
