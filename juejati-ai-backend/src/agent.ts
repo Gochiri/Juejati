@@ -320,13 +320,17 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         description: 'Búsqueda en nuestra red de propiedades asociadas. Usar SOLO cuando search_internal_properties no devuelve resultados.',
         parameters: z.object({
           zona: z.string().optional(),
-          operacion: z.string().optional()
+          operacion: z.string().optional(),
+          ambientes: z.coerce.number().optional().describe('Cantidad de ambientes'),
+          presupuesto_max: z.coerce.number().optional().describe('Presupuesto máximo en USD'),
         }),
         execute: async (args) => {
           const raw = await searchZonaPropScraper({
             barrio: args.zona,
-            tipo: 'departamento', // Juejati works exclusively with apartments
-            operacion: args.operacion
+            tipo: 'departamento',
+            operacion: args.operacion,
+            ambientes: args.ambientes,
+            presupuesto: args.presupuesto_max,
           });
           // Scraper returns { properties: [...], html: '...' } or an array
           const properties: any[] = Array.isArray(raw) ? raw : (raw?.properties || []);
@@ -342,7 +346,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
             await saveContactImages(contactId, cards);
           }
           // Build catalog URL so the agent can share a single link with all results
-          const catalogUrl = buildCatalogUrl({ tipo: 'departamento', operacion: args.operacion, barrio: args.zona });
+          const catalogUrl = buildCatalogUrl({ tipo: 'departamento', operacion: args.operacion, barrio: args.zona, ambientes: args.ambientes, presupuesto: args.presupuesto_max });
           // Map to cleaner format so agent never sees the raw zonaprop link
           return {
             properties: properties.map((r: any) => ({
