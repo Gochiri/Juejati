@@ -320,13 +320,20 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
         description: 'Búsqueda en nuestra red de propiedades asociadas. Usar SOLO cuando search_internal_properties no devuelve resultados.',
         parameters: z.object({
           zona: z.string().optional(),
-          operacion: z.string().optional()
+          operacion: z.string().optional(),
+          ambientes: z.coerce.number().optional().describe('Cantidad de ambientes (innegociable)'),
+          presupuesto: z.coerce.number().optional().describe('Presupuesto en USD'),
         }),
         execute: async (args) => {
+          const precioMin = args.presupuesto ? Math.round(args.presupuesto * 0.9) : undefined;
+          const precioMax = args.presupuesto ? Math.round(args.presupuesto * 1.1) : undefined;
           const raw = await searchZonaPropScraper({
             barrio: args.zona,
             tipo: 'departamento', // Juejati works exclusively with apartments
-            operacion: args.operacion
+            operacion: args.operacion,
+            ambientes: args.ambientes,
+            precio_min: precioMin,
+            precio_max: precioMax,
           });
           // Scraper returns { properties: [...], html: '...' } or an array
           const properties: any[] = Array.isArray(raw) ? raw : (raw?.properties || []);
@@ -342,7 +349,7 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
             await saveContactImages(contactId, cards);
           }
           // Build catalog URL so the agent can share a single link with all results
-          const catalogUrl = buildCatalogUrl({ tipo: 'departamento', operacion: args.operacion, barrio: args.zona });
+          const catalogUrl = buildCatalogUrl({ tipo: 'departamento', operacion: args.operacion, barrio: args.zona, ambientes: args.ambientes, precio_min: precioMin, precio_max: precioMax });
           // Map to cleaner format so agent never sees the raw zonaprop link
           return {
             properties: properties.map((r: any) => ({

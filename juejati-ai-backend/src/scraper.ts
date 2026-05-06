@@ -5,7 +5,7 @@ dotenv.config();
 const SCRAPER_API_URL = process.env.SCRAPER_API_URL || 'http://zonaprop-scraper:3000/api/search';
 const SCRAPER_PUBLIC_URL = process.env.SCRAPER_PUBLIC_URL || 'https://catalogo.korvance.com';
 
-export async function searchZonaPropScraper(filters: { tipo?: string, operacion?: string, barrio?: string }) {
+export async function searchZonaPropScraper(filters: { tipo?: string, operacion?: string, barrio?: string, ambientes?: number, precio_min?: number, precio_max?: number }) {
   try {
     const res = await fetch(SCRAPER_API_URL, {
       method: 'POST',
@@ -25,10 +25,13 @@ export async function searchZonaPropScraper(filters: { tipo?: string, operacion?
   }
 }
 
-export function buildCatalogUrl(filters: { tipo?: string, operacion?: string, barrio?: string }): string {
+export function buildCatalogUrl(filters: { tipo?: string, operacion?: string, barrio?: string, ambientes?: number, precio_min?: number, precio_max?: number }): string {
   const params = new URLSearchParams();
   if (filters.tipo) params.set('tipo', filters.tipo.toLowerCase());
   if (filters.operacion) params.set('operacion', filters.operacion.toLowerCase());
   if (filters.barrio) params.set('barrio', filters.barrio.toLowerCase().replace(/\s+/g, '-'));
+  if (filters.ambientes) params.set('ambientes', String(filters.ambientes));
+  if (filters.precio_min) params.set('precio_min', String(filters.precio_min));
+  if (filters.precio_max) params.set('precio_max', String(filters.precio_max));
   return `${SCRAPER_PUBLIC_URL}/busqueda?${params.toString()}`;
 }
