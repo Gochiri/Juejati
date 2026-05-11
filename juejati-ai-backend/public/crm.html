@@ -487,7 +487,8 @@ async function selectLead(contactId) {
   }
 
   // Find in list first for instant render
-  const found = state.leads.find(l => l.contactId === contactId);
+  const found = state.leads.find(l => l.contactId === contactId)
+             || state.filteredLeads.find(l => l.contactId === contactId);
   if (found) {
     state.selectedLead = { ...found };
     renderLeads();
