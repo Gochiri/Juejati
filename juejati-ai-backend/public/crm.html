@@ -570,16 +570,29 @@ async function fetchConversation(contactId) {
       return;
     }
     // Show last 8 messages, most recent at bottom
+    const CHANNEL_LABELS = {
+      'TYPE_WHATSAPP': { label: 'WhatsApp', cls: 'text-green-500' },
+      'TYPE_SMS':      { label: 'SMS',      cls: 'text-blue-400' },
+      'TYPE_EMAIL':    { label: 'Email',    cls: 'text-purple-400' },
+      'TYPE_PHONE':    { label: 'Llamada',  cls: 'text-yellow-500' },
+      'WhatsApp':      { label: 'WhatsApp', cls: 'text-green-500' },
+      'SMS':           { label: 'SMS',      cls: 'text-blue-400' },
+      'Email':         { label: 'Email',    cls: 'text-purple-400' },
+    };
     const last8 = messages.slice(-8);
     document.getElementById('detail-messages').innerHTML = last8.map(msg => {
       const isOut = msg.direction === 'outbound';
       const time = msg.createdAt ? new Date(msg.createdAt).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+      const ch = msg.channel ? (CHANNEL_LABELS[msg.channel] || { label: msg.channel, cls: 'text-gray-400' }) : null;
       return `
         <div class="flex flex-col ${isOut ? 'items-end' : 'items-start'}">
           <div class="msg-bubble ${isOut ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}">
             ${escHtml((msg.body || '').substring(0, 200))}${(msg.body || '').length > 200 ? '…' : ''}
           </div>
-          ${time ? `<span class="text-xs text-gray-300 mt-0.5 px-1">${time}</span>` : ''}
+          <div class="flex items-center gap-2 px-1 mt-0.5">
+            ${ch ? `<span class="text-xs ${ch.cls}">${ch.label}</span>` : ''}
+            ${time ? `<span class="text-xs text-gray-300">${time}</span>` : ''}
+          </div>
         </div>`;
     }).join('');
   } catch {
