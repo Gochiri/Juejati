@@ -217,7 +217,9 @@ async function fetchLeads(append = false) {
     state.leadsSearchMode = false;
     state.filteredLeads = [...state.leads];
     renderLeads();
-    fetchLeadsActivity(newLeads.map(l => l.contactId).filter(Boolean));
+    const newIds = newLeads.map(l => l.contactId).filter(Boolean);
+    fetchLeadsActivity(newIds);
+    fetchPropertyAssignments(newIds);
   } catch (err) {
     document.getElementById('leads-list').innerHTML = `<p class="text-xs text-red-500 p-3">${err.message}</p>`;
     document.getElementById('leads-count').textContent = 'Error al cargar leads';
@@ -345,6 +347,22 @@ function renderLeads() {
 async function loadMoreLeads() {
   state.leadsPage++;
   await fetchLeads(true);
+}
+
+async function fetchPropertyAssignments(contactIds) {
+  if (!contactIds.length) return;
+  try {
+    const data = await apiFetch('/crm/api/leads/property-assignments?contactIds=' + contactIds.join(','));
+    let changed = false;
+    for (const [contactId, tokkoId] of Object.entries(data)) {
+      const idx = state.leads.findIndex(l => l.contactId === contactId);
+      if (idx >= 0 && state.leads[idx].propiedad_tokko_id !== tokkoId) {
+        state.leads[idx].propiedad_tokko_id = tokkoId;
+        changed = true;
+      }
+    }
+    if (changed) renderProperties();
+  } catch {}
 }
 
 async function fetchLeadsActivity(contactIds) {

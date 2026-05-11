@@ -94,6 +94,38 @@ function mapOpportunity(opp: any) {
   };
 }
 
+// GET /crm/api/leads/property-assignments — batch-fetch propiedad_tokko_id for all contacts
+router.get('/crm/api/leads/property-assignments', async (req, res) => {
+  try {
+    const ids = String(req.query.contactIds || '').split(',').filter(Boolean).slice(0, 200);
+    if (ids.length === 0) return res.json({});
+
+    // Fetch in parallel batches of 10 to avoid overwhelming GHL
+    const assignments: Record<string, string | null> = {};
+    const BATCH = 10;
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
+      await Promise.all(batch.map(async (contactId) => {
+        try {
+          const ghlRes = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
+            method: 'GET', headers: GHL_HEADERS,
+          });
+          if (!ghlRes.ok) return;
+          const data = await ghlRes.json();
+          const contact = data.contact || data;
+          const customFields: any[] = contact.customFields || [];
+          const f = customFields.find((cf: any) => cf.id === GHL_FIELD_IDS.propiedad_tokko_id);
+          assignments[contactId] = f?.value ?? f?.field_value ?? null;
+        } catch {}
+      }));
+    }
+    res.json(assignments);
+  } catch (err: any) {
+    console.error('CRM property-assignments error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /crm/api/leads/activity — batch last-message per contact from message_log
 router.get('/crm/api/leads/activity', async (req, res) => {
   try {
