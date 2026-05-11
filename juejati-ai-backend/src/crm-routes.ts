@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from './db.js';
-import { updateContactFields, getContactById } from './ghl.js';
+import { updateContactFields, getContactById, getConversationHistory } from './ghl.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = Router();
@@ -226,6 +226,26 @@ router.get('/crm/api/properties', async (req, res) => {
     });
   } catch (err: any) {
     console.error('CRM properties error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /crm/api/leads/:contactId/messages — fetch conversation history from GHL
+router.get('/crm/api/leads/:contactId/messages', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const msgs = await getConversationHistory(req.params.contactId, limit);
+    // Normalize to consistent shape
+    const messages = msgs.map((m: any) => ({
+      id: m.id,
+      direction: m.direction || (m.messageType === 'TYPE_INCOMING' ? 'inbound' : 'outbound'),
+      body: m.body || m.messageText || m.text || '',
+      channel: m.channel || m.type || '',
+      createdAt: m.dateAdded || m.createdAt || m.date_added || null,
+    })).filter((m: any) => m.body);
+    res.json(messages);
+  } catch (err: any) {
+    console.error('CRM messages error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
