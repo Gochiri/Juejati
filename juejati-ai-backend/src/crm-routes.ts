@@ -79,6 +79,8 @@ function mapOpportunity(opp: any) {
     name: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Sin nombre',
     phone: contact.phone || '',
     stage: opp.stage?.name || opp.pipelineStage || '',
+    source: opp.source || contact.source || null,
+    createdAt: opp.createdAt || opp.dateAdded || null,
     score_lead: extractFieldValue(customFields, GHL_FIELD_IDS.score_lead),
     zona: extractFieldValue(customFields, GHL_FIELD_IDS.zona),
     operacion: extractFieldValue(customFields, GHL_FIELD_IDS.operacion),
@@ -91,6 +93,34 @@ function mapOpportunity(opp: any) {
     link_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.link_propiedad),
   };
 }
+
+// GET /crm/api/leads/activity — batch last-message per contact from message_log
+router.get('/crm/api/leads/activity', async (req, res) => {
+  try {
+    const ids = String(req.query.contactIds || '').split(',').filter(Boolean).slice(0, 200);
+    if (ids.length === 0) return res.json({});
+    const result = await pool.query(
+      `SELECT contact_id,
+              MAX(created_at) AS last_message_at,
+              (array_agg(direction ORDER BY created_at DESC))[1] AS last_direction
+       FROM message_log
+       WHERE contact_id = ANY($1)
+       GROUP BY contact_id`,
+      [ids]
+    );
+    const activity: Record<string, any> = {};
+    for (const row of result.rows) {
+      activity[row.contact_id] = {
+        lastMessageAt: row.last_message_at,
+        lastDirection: row.last_direction,
+      };
+    }
+    res.json(activity);
+  } catch (err: any) {
+    console.error('CRM activity error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /crm/api/leads — fetch GHL opportunities with pagination + server-side search
 router.get('/crm/api/leads', async (req, res) => {

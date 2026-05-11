@@ -136,6 +136,7 @@ const state = {
   leadsTotal: 0,
   leadsHasMore: false,
   leadsSearchMode: false,
+  leadsActivity: {},
   properties: [],
   propsTotal: 0,
   propsOffset: 0,
@@ -202,6 +203,7 @@ async function fetchLeads(append = false) {
     state.leadsSearchMode = false;
     state.filteredLeads = [...state.leads];
     renderLeads();
+    fetchLeadsActivity(newLeads.map(l => l.contactId).filter(Boolean));
   } catch (err) {
     document.getElementById('leads-list').innerHTML = `<p class="text-xs text-red-500 p-3">${err.message}</p>`;
     document.getElementById('leads-count').textContent = 'Error al cargar leads';
@@ -288,6 +290,30 @@ function renderLeads() {
           <span class="text-xs px-1.5 py-0.5 rounded-full ${stageCls}">${escHtml(lead.stage || '—')}</span>
         </div>
         ${hasProperty ? `<div class="text-xs text-green-600 mt-1.5 truncate">🏠 ${escHtml(lead.titulo_propiedad || '')}</div>` : ''}
+        ${(() => {
+          const activity = state.leadsActivity[lead.contactId];
+          const srcConf = getSourceConfig(lead.source);
+          const lastMsg = activity?.lastMessageAt;
+          const direction = activity?.lastDirection;
+          const timeLabel = lastMsg
+            ? timeAgo(lastMsg)
+            : (lead.createdAt ? 'ingresó ' + timeAgo(lead.createdAt, 'hace') : null);
+          const dirArrow = direction === 'inbound' ? ' ↓' : (direction === 'outbound' ? ' ↑' : '');
+          const timeCls = (() => {
+            if (!lastMsg && !lead.createdAt) return 'text-gray-300';
+            const days = lastMsg ? Math.floor((Date.now() - new Date(lastMsg).getTime()) / 86400000) : 999;
+            if (days <= 2)  return 'text-green-600';
+            if (days <= 7)  return 'text-yellow-600';
+            if (days <= 30) return 'text-orange-500';
+            return 'text-red-500';
+          })();
+          return `<div class="flex items-center justify-between mt-2 gap-1">
+            <div class="flex gap-1 flex-wrap">
+              ${srcConf ? `<span class="text-xs px-1.5 py-0.5 rounded-full ${srcConf.cls}">${escHtml(srcConf.label)}</span>` : ''}
+            </div>
+            ${timeLabel ? `<span class="text-xs ${timeCls} shrink-0">${escHtml(timeLabel)}${dirArrow}</span>` : ''}
+          </div>`;
+        })()}
       </div>`;
   }).join('');
 
@@ -304,6 +330,15 @@ function renderLeads() {
 async function loadMoreLeads() {
   state.leadsPage++;
   await fetchLeads(true);
+}
+
+async function fetchLeadsActivity(contactIds) {
+  if (!contactIds.length) return;
+  try {
+    const data = await apiFetch('/crm/api/leads/activity?contactIds=' + contactIds.join(','));
+    Object.assign(state.leadsActivity, data);
+    renderLeads();
+  } catch {}
 }
 
 function skeletonLeads() {
@@ -642,6 +677,42 @@ async function clearProperty() {
 // ─── Utils ────────────────────────────────────────────────────────────────────
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timeAgo(dateStr, prefix = 'hace') {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  const hs  = Math.floor(diff / 3600000);
+  const d   = Math.floor(diff / 86400000);
+  const sem = Math.floor(d / 7);
+  const mes = Math.floor(d / 30);
+  if (min < 2)  return `${prefix} un momento`;
+  if (min < 60) return `${prefix} ${min} min`;
+  if (hs  < 24) return `${prefix} ${hs} hs`;
+  if (d   < 7)  return `${prefix} ${d} día${d !== 1 ? 's' : ''}`;
+  if (sem < 5)  return `${prefix} ${sem} sem`;
+  return `${prefix} ${mes} mes${mes !== 1 ? 'es' : ''}`;
+}
+
+const SOURCE_CONFIG = {
+  whatsapp:  { label: 'WhatsApp',  cls: 'bg-green-100 text-green-700' },
+  facebook:  { label: 'Facebook',  cls: 'bg-blue-100 text-blue-700' },
+  instagram: { label: 'Instagram', cls: 'bg-pink-100 text-pink-700' },
+  form:      { label: 'Formulario', cls: 'bg-purple-100 text-purple-700' },
+  ads:       { label: 'Ads',       cls: 'bg-orange-100 text-orange-700' },
+  other:     { label: null,        cls: 'bg-gray-100 text-gray-500' },
+};
+
+function getSourceConfig(source) {
+  if (!source) return null;
+  const s = source.toLowerCase();
+  if (s.includes('whatsapp')) return SOURCE_CONFIG.whatsapp;
+  if (s.includes('facebook')) return SOURCE_CONFIG.facebook;
+  if (s.includes('instagram')) return SOURCE_CONFIG.instagram;
+  if (s.includes('form')) return SOURCE_CONFIG.form;
+  if (s.includes('ads') || s.includes('ad ')) return SOURCE_CONFIG.ads;
+  return { label: source, cls: SOURCE_CONFIG.other.cls };
 }
 
 let filterTimer;
