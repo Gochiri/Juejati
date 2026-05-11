@@ -119,6 +119,20 @@
   </aside>
 </div>
 
+<!-- Leads-for-property popover -->
+<div id="prop-popover" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onclick="closePropPopover(event)">
+  <div class="bg-white rounded-2xl shadow-2xl w-80 max-h-[70vh] flex flex-col" onclick="event.stopPropagation()">
+    <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-start">
+      <div>
+        <h3 id="popover-title" class="font-bold text-gray-800 text-sm leading-tight"></h3>
+        <p id="popover-subtitle" class="text-xs text-gray-400 mt-0.5"></p>
+      </div>
+      <button onclick="closePropPopover()" class="text-gray-400 hover:text-gray-600 ml-2 text-lg leading-none shrink-0">✕</button>
+    </div>
+    <div id="popover-leads" class="overflow-y-auto flex-1 p-3 space-y-2"></div>
+  </div>
+</div>
+
 <!-- Toast notification -->
 <div id="toast" class="toast hidden">
   <div class="bg-gray-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
@@ -412,6 +426,15 @@ function renderProperties() {
           </div>
           ${precio ? `<span class="absolute top-2 right-2 bg-black/65 text-white text-xs font-bold px-2 py-1 rounded-lg">${precio}</span>` : ''}
           ${prop.operacion ? `<span class="absolute top-2 left-2 text-xs px-1.5 py-0.5 rounded-lg font-medium ${prop.operacion.toLowerCase().includes('venta') ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'}">${prop.operacion.toLowerCase().includes('venta') ? 'Venta' : 'Alquiler'}</span>` : ''}
+          ${(() => {
+            const interested = state.leads.filter(l => l.propiedad_tokko_id && String(l.propiedad_tokko_id) === String(prop.tokko_id));
+            return interested.length > 0
+              ? `<button onclick="showLeadsForProperty(${prop.tokko_id}, event)"
+                         class="absolute bottom-2 right-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold w-6 h-6 rounded-full shadow-lg flex items-center justify-center transition-colors">
+                   ${interested.length}
+                 </button>`
+              : '';
+          })()}
           ${isAssigned ? `
             <div class="absolute inset-0 bg-green-500/20 flex items-end justify-center pb-3">
               <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow">Asignada ✓</span>
@@ -740,6 +763,42 @@ function onFilterChange() {
     state.propsOffset = 0;
     fetchProperties();
   }, 400);
+}
+
+// ─── Property leads popover ───────────────────────────────────────────────────
+function showLeadsForProperty(tokkoId, event) {
+  event.stopPropagation();
+  const prop = state.properties.find(p => String(p.tokko_id) === String(tokkoId));
+  const interested = state.leads.filter(l => l.propiedad_tokko_id && String(l.propiedad_tokko_id) === String(tokkoId));
+
+  document.getElementById('popover-title').textContent = prop?.titulo || 'Propiedad';
+  document.getElementById('popover-subtitle').textContent =
+    `${interested.length} lead${interested.length !== 1 ? 's' : ''} asignado${interested.length !== 1 ? 's' : ''}`;
+
+  const SCORE_DOTS = { frio: '#60a5fa', tibio: '#fbbf24', caliente: '#f87171' };
+  document.getElementById('popover-leads').innerHTML = interested.map(lead => {
+    const score = lead.score_lead?.toLowerCase();
+    const dot = SCORE_DOTS[score];
+    const stageCls = STAGE_COLORS[lead.stage] || STAGE_COLORS.default;
+    return `
+      <div class="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors"
+           onclick="closePropPopover(); selectLead('${lead.contactId}')">
+        ${dot ? `<span class="w-2 h-2 rounded-full shrink-0" style="background:${dot}"></span>` : '<span class="w-2 h-2 shrink-0"></span>'}
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm text-gray-800 truncate">${escHtml(lead.name)}</p>
+          <p class="text-xs text-gray-400 truncate">${escHtml(lead.phone)}</p>
+        </div>
+        <span class="text-xs px-1.5 py-0.5 rounded-full shrink-0 ${stageCls}">${escHtml(lead.stage || '—')}</span>
+      </div>`;
+  }).join('');
+
+  document.getElementById('prop-popover').classList.remove('hidden');
+}
+
+function closePropPopover(event) {
+  if (!event || event.target === document.getElementById('prop-popover')) {
+    document.getElementById('prop-popover').classList.add('hidden');
+  }
 }
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
