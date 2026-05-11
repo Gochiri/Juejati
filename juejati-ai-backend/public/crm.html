@@ -354,14 +354,19 @@ async function fetchPropertyAssignments(contactIds) {
   try {
     const data = await apiFetch('/crm/api/leads/property-assignments?contactIds=' + contactIds.join(','));
     let changed = false;
-    for (const [contactId, tokkoId] of Object.entries(data)) {
+    for (const [contactId, fields] of Object.entries(data)) {
       const idx = state.leads.findIndex(l => l.contactId === contactId);
-      if (idx >= 0 && state.leads[idx].propiedad_tokko_id !== tokkoId) {
-        state.leads[idx].propiedad_tokko_id = tokkoId;
+      if (idx >= 0) {
+        Object.assign(state.leads[idx], fields);
         changed = true;
+        // Update selectedLead too if it's the same contact
+        if (state.selectedLead?.contactId === contactId) {
+          Object.assign(state.selectedLead, fields);
+        }
       }
     }
-    if (changed) renderProperties();
+    if (changed) { renderProperties(); renderLeads(); }
+    if (state.selectedLead) renderLeadDetail(state.selectedLead);
   } catch {}
 }
 
@@ -592,7 +597,7 @@ function renderLeadDetail(lead) {
   if (lead.propiedad_tokko_id) {
     assignedCard.innerHTML = `
       <div class="p-3">
-        <p class="font-semibold text-sm text-gray-800 leading-tight">${escHtml(lead.titulo_propiedad || 'Propiedad asignada')}</p>
+        <p class="font-semibold text-sm text-gray-800 leading-tight">${escHtml(lead.titulo_propiedad || lead.propiedad_de_interes || 'Sin título')}</p>
         <p class="text-xs text-gray-500 mt-0.5">${escHtml(lead.ubicacion_propiedad || '')}</p>
         ${lead.precio_propiedad ? `<p class="text-xs font-medium text-blue-700 mt-1">${escHtml(lead.precio_propiedad)}</p>` : ''}
         ${lead.link_propiedad ? `<a href="${escHtml(lead.link_propiedad)}" target="_blank" class="text-xs text-blue-500 hover:underline mt-1 block">Ver ficha →</a>` : ''}

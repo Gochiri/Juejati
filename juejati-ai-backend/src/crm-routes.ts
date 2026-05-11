@@ -101,7 +101,7 @@ router.get('/crm/api/leads/property-assignments', async (req, res) => {
     if (ids.length === 0) return res.json({});
 
     // Fetch in parallel batches of 10 to avoid overwhelming GHL
-    const assignments: Record<string, string | null> = {};
+    const assignments: Record<string, any> = {};
     const BATCH = 10;
     for (let i = 0; i < ids.length; i += BATCH) {
       const batch = ids.slice(i, i + BATCH);
@@ -114,8 +114,17 @@ router.get('/crm/api/leads/property-assignments', async (req, res) => {
           const data = await ghlRes.json();
           const contact = data.contact || data;
           const customFields: any[] = contact.customFields || [];
-          const f = customFields.find((cf: any) => cf.id === GHL_FIELD_IDS.propiedad_tokko_id);
-          assignments[contactId] = f?.value ?? f?.field_value ?? null;
+          const get = (id: string) => {
+            const f = customFields.find((cf: any) => cf.id === id);
+            return f?.value ?? f?.field_value ?? null;
+          };
+          assignments[contactId] = {
+            propiedad_tokko_id: get(GHL_FIELD_IDS.propiedad_tokko_id),
+            titulo_propiedad: get(GHL_FIELD_IDS.titulo_propiedad) || get(GHL_FIELD_IDS.propiedad_de_interes),
+            precio_propiedad: get(GHL_FIELD_IDS.precio_propiedad),
+            ubicacion_propiedad: get(GHL_FIELD_IDS.ubicacion_propiedad),
+            link_propiedad: get(GHL_FIELD_IDS.link_propiedad),
+          };
         } catch {}
       }));
     }
