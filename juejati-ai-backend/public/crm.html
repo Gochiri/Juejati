@@ -579,7 +579,7 @@ async function fetchConversation(contactId) {
       'SMS':           { label: 'SMS',      cls: 'text-blue-400' },
       'Email':         { label: 'Email',    cls: 'text-purple-400' },
     };
-    const last8 = messages.slice(-8);
+    const last8 = [...messages].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()).slice(-8);
     document.getElementById('detail-messages').innerHTML = last8.map(msg => {
       const isOut = msg.direction === 'outbound';
       const time = msg.createdAt ? new Date(msg.createdAt).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
