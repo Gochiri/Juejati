@@ -132,6 +132,10 @@
 const state = {
   leads: [],
   filteredLeads: [],
+  leadsPage: 1,
+  leadsTotal: 0,
+  leadsHasMore: false,
+  leadsSearchMode: false,
   properties: [],
   propsTotal: 0,
   propsOffset: 0,
@@ -181,34 +185,72 @@ function showToast(text, icon = '✓', isError = false) {
 }
 
 // ─── Leads ────────────────────────────────────────────────────────────────────
-async function fetchLeads() {
+async function fetchLeads(append = false) {
+  if (!append) {
+    document.getElementById('leads-list').innerHTML = skeletonLeads();
+    state.leadsPage = 1;
+    state.leads = [];
+  }
   document.getElementById('leads-count').textContent = 'Cargando...';
-  document.getElementById('leads-list').innerHTML = skeletonLeads();
   try {
-    const data = await apiFetch('/crm/api/leads?limit=100');
-    state.leads = data.leads || [];
-    filterLeads();
+    const params = new URLSearchParams({ limit: '100', page: String(state.leadsPage) });
+    const data = await apiFetch('/crm/api/leads?' + params);
+    const newLeads = data.leads || [];
+    state.leads = append ? [...state.leads, ...newLeads] : newLeads;
+    state.leadsTotal = data.total || state.leads.length;
+    state.leadsHasMore = data.hasMore || false;
+    state.leadsSearchMode = false;
+    state.filteredLeads = [...state.leads];
+    renderLeads();
   } catch (err) {
     document.getElementById('leads-list').innerHTML = `<p class="text-xs text-red-500 p-3">${err.message}</p>`;
     document.getElementById('leads-count').textContent = 'Error al cargar leads';
   }
 }
 
+let leadSearchTimer;
 function filterLeads() {
-  const q = document.getElementById('lead-search').value.toLowerCase();
-  state.filteredLeads = q
-    ? state.leads.filter(l =>
-        (l.name || '').toLowerCase().includes(q) ||
-        (l.phone || '').includes(q) ||
-        (l.zona || '').toLowerCase().includes(q)
-      )
-    : [...state.leads];
-  renderLeads();
+  const q = document.getElementById('lead-search').value.trim();
+  clearTimeout(leadSearchTimer);
+  if (q.length === 0) {
+    // Reset to full list
+    if (state.leadsSearchMode) fetchLeads();
+    else { state.filteredLeads = [...state.leads]; renderLeads(); }
+    return;
+  }
+  if (q.length < 2) {
+    // Client-side filter only
+    state.filteredLeads = state.leads.filter(l =>
+      (l.name || '').toLowerCase().includes(q.toLowerCase()) ||
+      (l.phone || '').includes(q) ||
+      (l.zona || '').toLowerCase().includes(q.toLowerCase())
+    );
+    renderLeads();
+    return;
+  }
+  // Debounced server-side search
+  leadSearchTimer = setTimeout(async () => {
+    document.getElementById('leads-count').textContent = 'Buscando...';
+    document.getElementById('leads-list').innerHTML = skeletonLeads();
+    try {
+      const data = await apiFetch(`/crm/api/leads?q=${encodeURIComponent(q)}&limit=100`);
+      state.filteredLeads = data.leads || [];
+      state.leadsHasMore = false;
+      state.leadsSearchMode = true;
+      renderLeads();
+    } catch (err) {
+      document.getElementById('leads-count').textContent = 'Error';
+    }
+  }, 500);
 }
 
 function renderLeads() {
   const count = state.filteredLeads.length;
-  document.getElementById('leads-count').textContent = `${count} lead${count !== 1 ? 's' : ''}`;
+  const total = state.leadsTotal || count;
+  const countLabel = state.leadsSearchMode
+    ? `${count} resultado${count !== 1 ? 's' : ''}`
+    : `${count} de ${total} leads`;
+  document.getElementById('leads-count').textContent = countLabel;
 
   const container = document.getElementById('leads-list');
   if (count === 0) {
@@ -248,6 +290,20 @@ function renderLeads() {
         ${hasProperty ? `<div class="text-xs text-green-600 mt-1.5 truncate">🏠 ${escHtml(lead.titulo_propiedad || '')}</div>` : ''}
       </div>`;
   }).join('');
+
+  // "Cargar más" button
+  if (state.leadsHasMore && !state.leadsSearchMode) {
+    container.innerHTML += `
+      <button onclick="loadMoreLeads()"
+              class="w-full mt-2 py-2 text-xs font-medium text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors">
+        Cargar más (${state.leads.length} de ${state.leadsTotal})
+      </button>`;
+  }
+}
+
+async function loadMoreLeads() {
+  state.leadsPage++;
+  await fetchLeads(true);
 }
 
 function skeletonLeads() {

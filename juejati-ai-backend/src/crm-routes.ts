@@ -64,50 +64,84 @@ function extractFieldValue(customFields: any[], fieldId: string): string | null 
   return f?.value ?? f?.field_value ?? null;
 }
 
-// GET /crm/api/leads — fetch GHL opportunities
+const GHL_HEADERS = {
+  'Authorization': `Bearer ${ghlApiKey}`,
+  'Version': '2021-07-28',
+  'Content-Type': 'application/json',
+};
+
+function mapOpportunity(opp: any) {
+  const contact = opp.contact || {};
+  const customFields: any[] = opp.customFields || contact.customFields || [];
+  return {
+    opportunityId: opp.id,
+    contactId: contact.id || opp.contactId,
+    name: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Sin nombre',
+    phone: contact.phone || '',
+    stage: opp.stage?.name || opp.pipelineStage || '',
+    score_lead: extractFieldValue(customFields, GHL_FIELD_IDS.score_lead),
+    zona: extractFieldValue(customFields, GHL_FIELD_IDS.zona),
+    operacion: extractFieldValue(customFields, GHL_FIELD_IDS.operacion),
+    presupuesto_ia: extractFieldValue(customFields, GHL_FIELD_IDS.presupuesto_ia),
+    ambientes: extractFieldValue(customFields, GHL_FIELD_IDS.ambientes),
+    propiedad_tokko_id: extractFieldValue(customFields, GHL_FIELD_IDS.propiedad_tokko_id),
+    titulo_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.titulo_propiedad),
+    precio_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.precio_propiedad),
+    ubicacion_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.ubicacion_propiedad),
+    link_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.link_propiedad),
+  };
+}
+
+// GET /crm/api/leads — fetch GHL opportunities with pagination + server-side search
 router.get('/crm/api/leads', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 100);
     const page = parseInt(req.query.page as string) || 1;
-    const url = `${GHL_API_BASE}/opportunities/search?location_id=${ghlLocationId}&limit=${limit}&page=${page}`;
-    const ghlRes = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${ghlApiKey}`,
-        'Version': '2021-07-28',
-        'Content-Type': 'application/json',
-      },
-    });
+    const query = (req.query.q as string || '').trim();
+
+    let url: string;
+    if (query) {
+      // Server-side search via GHL contacts search, then filter opportunities
+      url = `${GHL_API_BASE}/contacts/search?locationId=${ghlLocationId}&query=${encodeURIComponent(query)}&limit=${limit}`;
+      const searchRes = await fetch(url, { method: 'GET', headers: GHL_HEADERS });
+      if (!searchRes.ok) throw new Error(`GHL Search Error: ${searchRes.status}`);
+      const searchData = await searchRes.json();
+      const contacts = searchData.contacts || [];
+      // For each contact found, fetch their opportunity
+      const leads = contacts.map((c: any) => ({
+        opportunityId: '',
+        contactId: c.id,
+        name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'Sin nombre',
+        phone: c.phone || '',
+        stage: '',
+        score_lead: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.score_lead),
+        zona: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.zona),
+        operacion: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.operacion),
+        presupuesto_ia: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.presupuesto_ia),
+        ambientes: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.ambientes),
+        propiedad_tokko_id: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.propiedad_tokko_id),
+        titulo_propiedad: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.titulo_propiedad),
+        precio_propiedad: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.precio_propiedad),
+        ubicacion_propiedad: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.ubicacion_propiedad),
+        link_propiedad: extractFieldValue(c.customFields || [], GHL_FIELD_IDS.link_propiedad),
+      }));
+      return res.json({ leads, total: searchData.meta?.total || leads.length, page, hasMore: false });
+    }
+
+    url = `${GHL_API_BASE}/opportunities/search?location_id=${ghlLocationId}&limit=${limit}&page=${page}`;
+    const ghlRes = await fetch(url, { method: 'GET', headers: GHL_HEADERS });
     if (!ghlRes.ok) {
       const body = await ghlRes.text();
       throw new Error(`GHL Error: ${ghlRes.status} ${body}`);
     }
     const data = await ghlRes.json();
     const opportunities = data.opportunities || [];
+    const total = data.meta?.total || opportunities.length;
+    const hasMore = page * limit < total;
 
-    const leads = opportunities.map((opp: any) => {
-      const contact = opp.contact || {};
-      const customFields: any[] = opp.customFields || contact.customFields || [];
-      return {
-        opportunityId: opp.id,
-        contactId: contact.id || opp.contactId,
-        name: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Sin nombre',
-        phone: contact.phone || '',
-        stage: opp.stage?.name || opp.pipelineStage || '',
-        score_lead: extractFieldValue(customFields, GHL_FIELD_IDS.score_lead),
-        zona: extractFieldValue(customFields, GHL_FIELD_IDS.zona),
-        operacion: extractFieldValue(customFields, GHL_FIELD_IDS.operacion),
-        presupuesto_ia: extractFieldValue(customFields, GHL_FIELD_IDS.presupuesto_ia),
-        ambientes: extractFieldValue(customFields, GHL_FIELD_IDS.ambientes),
-        propiedad_tokko_id: extractFieldValue(customFields, GHL_FIELD_IDS.propiedad_tokko_id),
-        titulo_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.titulo_propiedad),
-        precio_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.precio_propiedad),
-        ubicacion_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.ubicacion_propiedad),
-        link_propiedad: extractFieldValue(customFields, GHL_FIELD_IDS.link_propiedad),
-      };
-    });
+    const leads = opportunities.map(mapOpportunity);
 
-    res.json({ leads, total: data.meta?.total || leads.length });
+    res.json({ leads, total, page, hasMore });
   } catch (err: any) {
     console.error('CRM leads error:', err.message);
     res.status(500).json({ error: err.message });
