@@ -9,6 +9,7 @@ import { syncProperties } from './sync.js';
 import { logMessage, logError, initAdminTables, saveContactName } from './admin-db.js';
 import { getContactName } from './ghl.js';
 import adminRouter from './admin-routes.js';
+import crmRouter from './crm-routes.js';
 import { CoreMessage } from 'ai';
 
 dotenv.config();
@@ -30,6 +31,9 @@ app.use(express.json());
 // Admin dashboard routes (API + static files)
 app.use(adminRouter);
 app.use('/admin', express.static(path.join(__dirname, '..', 'public')));
+
+// CRM frontend routes
+app.use(crmRouter);
 
 const PORT = process.env.PORT || 4000;
 

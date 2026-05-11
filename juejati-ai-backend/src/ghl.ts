@@ -135,3 +135,10 @@ export async function updateContactFields(contactId: string, customFields: { id:
   if (!res.ok) throw new Error(`GHL Error updating fields: ${res.statusText}`);
   return res.json();
 }
+
+export async function getContactById(contactId: string) {
+  const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, { method: 'GET', headers });
+  if (!res.ok) throw new Error(`GHL Error fetching contact: ${res.statusText}`);
+  const data = await res.json();
+  return data.contact || data;
+}

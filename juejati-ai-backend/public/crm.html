@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juejati CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .lead-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
+    .prop-card.assigned { border-color: #22c55e !important; }
+    .drawer-open { transform: translateX(0) !important; }
+    .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .score-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    img { user-select: none; }
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; transition: all .3s; }
+    .msg-bubble { max-width: 80%; padding: 6px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; }
+  </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex flex-col">
+
+<!-- Top bar -->
+<header class="bg-white border-b border-gray-200 px-4 h-14 flex items-center gap-4 shrink-0 shadow-sm">
+  <div class="flex items-center gap-2 mr-2">
+    <span class="font-bold text-lg text-gray-800 tracking-tight">Juejati</span>
+    <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">CRM</span>
+  </div>
+
+  <!-- Property filters -->
+  <div class="flex items-center gap-2 flex-1 flex-wrap">
+    <input id="filter-q" type="text" placeholder="Buscar propiedad..." class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-blue-300">
+    <input id="filter-barrio" type="text" placeholder="Barrio" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-300">
+    <select id="filter-ambientes" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <option value="">Ambientes</option>
+      <option value="1">1 amb</option>
+      <option value="2">2 amb</option>
+      <option value="3">3 amb</option>
+      <option value="4">4 amb</option>
+      <option value="5">5+ amb</option>
+    </select>
+    <select id="filter-operacion" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <option value="">Operación</option>
+      <option value="venta">Venta</option>
+      <option value="alquiler">Alquiler</option>
+    </select>
+    <input id="filter-precio" type="number" placeholder="Precio máx USD" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-300">
+  </div>
+
+  <a href="/admin/" class="text-xs text-gray-400 hover:text-gray-600 ml-auto shrink-0">Admin →</a>
+</header>
+
+<!-- Three-panel layout -->
+<div class="flex flex-1 overflow-hidden">
+
+  <!-- LEFT: Lead list -->
+  <aside class="w-80 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
+    <div class="p-3 border-b border-gray-100">
+      <input id="lead-search" type="text" placeholder="Buscar lead..." class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <div id="leads-count" class="text-xs text-gray-400 mt-1.5 px-1">Cargando leads...</div>
+    </div>
+    <div id="leads-list" class="overflow-y-auto flex-1 p-2 space-y-1.5">
+      <!-- Lead cards injected by JS -->
+    </div>
+  </aside>
+
+  <!-- CENTER: Property grid -->
+  <main class="flex-1 overflow-y-auto p-4 bg-gray-50">
+    <div id="props-grid" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+      <!-- Property cards injected by JS -->
+    </div>
+    <!-- Pagination -->
+    <div id="props-pagination" class="flex justify-center items-center mt-6 gap-2 pb-4"></div>
+  </main>
+
+  <!-- RIGHT: Lead detail drawer (slide in from right) -->
+  <aside id="panel-detail"
+         class="w-96 bg-white border-l border-gray-200 flex flex-col h-full shrink-0"
+         style="transform: translateX(100%); transition: transform .25s ease;">
+    <!-- Header -->
+    <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+      <h2 id="detail-name" class="font-bold text-gray-800 text-base truncate mr-2"></h2>
+      <button id="detail-close" class="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
+    </div>
+
+    <div class="overflow-y-auto flex-1 p-4 space-y-5">
+
+      <!-- Contact info -->
+      <section>
+        <a id="detail-phone-link" href="#" class="text-sm text-blue-600 hover:underline font-medium" target="_blank"></a>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <span id="detail-stage" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"></span>
+          <span id="detail-score-badge" class="text-xs px-2 py-0.5 rounded-full hidden"></span>
+        </div>
+        <div id="detail-criteria" class="text-xs text-gray-500 mt-2 bg-gray-50 rounded-lg p-2 leading-5"></div>
+      </section>
+
+      <!-- Assigned property -->
+      <section>
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Propiedad asignada</h3>
+        <div id="detail-assigned-card" class="border rounded-xl overflow-hidden bg-gray-50">
+          <!-- Filled by JS -->
+        </div>
+        <button id="detail-clear-btn" class="mt-2 text-xs text-red-500 hover:text-red-700 hidden">
+          ✕ Quitar propiedad asignada
+        </button>
+      </section>
+
+      <!-- Conversation preview -->
+      <section>
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Últimos mensajes</h3>
+        <div id="detail-messages" class="space-y-2">
+          <div class="text-xs text-gray-400">Cargando...</div>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="toast hidden">
+  <div class="bg-gray-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+    <span id="toast-icon">✓</span>
+    <span id="toast-text"></span>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const state = {
+  leads: [],
+  filteredLeads: [],
+  properties: [],
+  propsTotal: 0,
+  propsOffset: 0,
+  selectedLead: null,
+  assigning: false,
+};
+
+const SCORE_CONFIG = {
+  frio:     { label: 'Frío',     cls: 'bg-blue-100 text-blue-700',   dot: '#60a5fa' },
+  tibio:    { label: 'Tibio',    cls: 'bg-yellow-100 text-yellow-700', dot: '#fbbf24' },
+  caliente: { label: 'Caliente', cls: 'bg-red-100 text-red-700',     dot: '#f87171' },
+};
+
+const STAGE_COLORS = {
+  default: 'bg-gray-100 text-gray-600',
+  'Nuevo Lead': 'bg-gray-100 text-gray-500',
+  'Contactado': 'bg-blue-100 text-blue-700',
+  'En seguimiento': 'bg-indigo-100 text-indigo-700',
+  'En proceso': 'bg-yellow-100 text-yellow-800',
+  'Agendó Videollamada': 'bg-purple-100 text-purple-700',
+  'Coordinando Visita': 'bg-orange-100 text-orange-700',
+  'Visita Programada': 'bg-pink-100 text-pink-700',
+  'Oferta': 'bg-amber-100 text-amber-800',
+  'Cerrado': 'bg-green-100 text-green-700',
+};
+
+// ─── Fetch helpers ─────────────────────────────────────────────────────────────
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
+// ─── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(text, icon = '✓', isError = false) {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  document.getElementById('toast-icon').textContent = icon;
+  el.firstElementChild.className = `${isError ? 'bg-red-600' : 'bg-gray-800'} text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2`;
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+// ─── Leads ────────────────────────────────────────────────────────────────────
+async function fetchLeads() {
+  document.getElementById('leads-count').textContent = 'Cargando...';
+  document.getElementById('leads-list').innerHTML = skeletonLeads();
+  try {
+    const data = await apiFetch('/crm/api/leads?limit=100');
+    state.leads = data.leads || [];
+    filterLeads();
+  } catch (err) {
+    document.getElementById('leads-list').innerHTML = `<p class="text-xs text-red-500 p-3">${err.message}</p>`;
+    document.getElementById('leads-count').textContent = 'Error al cargar leads';
+  }
+}
+
+function filterLeads() {
+  const q = document.getElementById('lead-search').value.toLowerCase();
+  state.filteredLeads = q
+    ? state.leads.filter(l =>
+        (l.name || '').toLowerCase().includes(q) ||
+        (l.phone || '').includes(q) ||
+        (l.zona || '').toLowerCase().includes(q)
+      )
+    : [...state.leads];
+  renderLeads();
+}
+
+function renderLeads() {
+  const count = state.filteredLeads.length;
+  document.getElementById('leads-count').textContent = `${count} lead${count !== 1 ? 's' : ''}`;
+
+  const container = document.getElementById('leads-list');
+  if (count === 0) {
+    container.innerHTML = '<p class="text-xs text-gray-400 p-3 text-center">Sin resultados</p>';
+    return;
+  }
+
+  container.innerHTML = state.filteredLeads.map(lead => {
+    const isSelected = state.selectedLead?.contactId === lead.contactId;
+    const score = lead.score_lead?.toLowerCase();
+    const scoreConf = SCORE_CONFIG[score] || null;
+    const hasProperty = !!lead.propiedad_tokko_id;
+    const stageCls = STAGE_COLORS[lead.stage] || STAGE_COLORS.default;
+
+    const criteria = [
+      lead.zona && `📍 ${lead.zona}`,
+      lead.ambientes && `${lead.ambientes} amb`,
+      lead.presupuesto_ia && `USD ${Number(lead.presupuesto_ia).toLocaleString('es-AR')}`,
+    ].filter(Boolean).join(' · ');
+
+    return `
+      <div class="lead-card cursor-pointer rounded-xl border border-gray-200 p-3 hover:border-blue-300 transition-colors ${isSelected ? 'selected' : ''}"
+           data-contact-id="${lead.contactId}"
+           onclick="selectLead('${lead.contactId}')">
+        <div class="flex items-start justify-between gap-1">
+          <div class="flex items-center gap-1.5 min-w-0">
+            ${scoreConf ? `<span class="score-dot mt-0.5" style="background:${scoreConf.dot}"></span>` : ''}
+            <span class="font-semibold text-gray-800 text-sm truncate">${escHtml(lead.name)}</span>
+          </div>
+          ${hasProperty ? '<span class="text-green-500 text-xs shrink-0">✓</span>' : ''}
+        </div>
+        <div class="text-xs text-gray-500 mt-0.5">${escHtml(lead.phone)}</div>
+        ${criteria ? `<div class="text-xs text-gray-400 mt-1">${escHtml(criteria)}</div>` : ''}
+        <div class="flex items-center gap-1.5 mt-2">
+          <span class="text-xs px-1.5 py-0.5 rounded-full ${stageCls}">${escHtml(lead.stage || '—')}</span>
+        </div>
+        ${hasProperty ? `<div class="text-xs text-green-600 mt-1.5 truncate">🏠 ${escHtml(lead.titulo_propiedad || '')}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function skeletonLeads() {
+  return Array(6).fill(0).map(() =>
+    `<div class="rounded-xl border border-gray-100 p-3 space-y-2">
+      <div class="skeleton h-3 w-3/4 rounded"></div>
+      <div class="skeleton h-2.5 w-1/2 rounded"></div>
+      <div class="skeleton h-2.5 w-2/3 rounded"></div>
+    </div>`
+  ).join('');
+}
+
+// ─── Properties ───────────────────────────────────────────────────────────────
+async function fetchProperties() {
+  document.getElementById('props-grid').innerHTML = skeletonProps();
+  const params = new URLSearchParams({
+    limit: '48',
+    offset: String(state.propsOffset),
+  });
+  const q = document.getElementById('filter-q').value.trim();
+  const barrio = document.getElementById('filter-barrio').value.trim();
+  const ambientes = document.getElementById('filter-ambientes').value;
+  const operacion = document.getElementById('filter-operacion').value;
+  const precio = document.getElementById('filter-precio').value;
+  if (q) params.set('q', q);
+  if (barrio) params.set('barrio', barrio);
+  if (ambientes) params.set('ambientes', ambientes);
+  if (operacion) params.set('operacion', operacion);
+  if (precio) params.set('precio_max', precio);
+
+  try {
+    const data = await apiFetch('/crm/api/properties?' + params);
+    state.properties = data.properties || [];
+    state.propsTotal = data.total || 0;
+    renderProperties();
+    renderPagination();
+  } catch (err) {
+    document.getElementById('props-grid').innerHTML = `<p class="text-sm text-red-500 col-span-full p-4">${err.message}</p>`;
+  }
+}
+
+function renderProperties() {
+  const grid = document.getElementById('props-grid');
+  if (state.properties.length === 0) {
+    grid.innerHTML = '<p class="text-sm text-gray-400 col-span-full text-center py-12">Sin propiedades con esos filtros</p>';
+    return;
+  }
+
+  grid.innerHTML = state.properties.map(prop => {
+    const assignedTokkoId = state.selectedLead?.propiedad_tokko_id;
+    const isAssigned = assignedTokkoId && String(assignedTokkoId) === String(prop.tokko_id);
+    const precio = prop.precio ? `${prop.moneda || 'USD'} ${Number(prop.precio).toLocaleString('es-AR')}` : '';
+    const details = [
+      prop.ambientes && `${prop.ambientes} amb`,
+      prop.dormitorios && `${prop.dormitorios} dorm`,
+      prop.superficie && `${prop.superficie} m²`,
+    ].filter(Boolean).join(' · ');
+
+    const hasLead = !!state.selectedLead;
+
+    return `
+      <div class="prop-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border-2 ${isAssigned ? 'assigned border-green-400' : 'border-transparent'}"
+           data-tokko-id="${prop.tokko_id}">
+        <div class="relative h-44 bg-gray-100">
+          <img src="${escHtml(prop.imagen || '')}" alt=""
+               class="w-full h-full object-cover"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div style="display:none" class="w-full h-full items-center justify-center bg-gray-100">
+            <span class="text-3xl">🏢</span>
+          </div>
+          ${precio ? `<span class="absolute top-2 right-2 bg-black/65 text-white text-xs font-bold px-2 py-1 rounded-lg">${precio}</span>` : ''}
+          ${prop.operacion ? `<span class="absolute top-2 left-2 text-xs px-1.5 py-0.5 rounded-lg font-medium ${prop.operacion.toLowerCase().includes('venta') ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'}">${prop.operacion.toLowerCase().includes('venta') ? 'Venta' : 'Alquiler'}</span>` : ''}
+          ${isAssigned ? `
+            <div class="absolute inset-0 bg-green-500/20 flex items-end justify-center pb-3">
+              <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow">Asignada ✓</span>
+            </div>` : ''}
+        </div>
+        <div class="p-3">
+          <p class="font-semibold text-gray-800 text-sm leading-tight truncate" title="${escHtml(prop.titulo || '')}">${escHtml(prop.titulo || 'Sin título')}</p>
+          <p class="text-xs text-gray-500 mt-0.5 truncate">${escHtml([prop.barrio, prop.direccion].filter(Boolean).join(' · '))}</p>
+          ${details ? `<p class="text-xs text-gray-400 mt-0.5">${details}</p>` : ''}
+          <div class="mt-3 flex gap-2 items-center">
+            ${hasLead
+              ? `<button onclick="assignProperty(${prop.tokko_id})"
+                         class="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isAssigned ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700' : 'bg-blue-600 text-white hover:bg-blue-700'}">
+                   ${isAssigned ? 'Asignada ✓' : 'Asignar'}
+                 </button>`
+              : `<button disabled class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-400 cursor-not-allowed">Seleccioná un lead</button>`
+            }
+            ${prop.ficha_tokko ? `<a href="${escHtml(prop.ficha_tokko)}" target="_blank" class="text-xs text-gray-400 hover:text-blue-500 py-1.5 px-1 shrink-0" title="Ver ficha">↗</a>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function skeletonProps() {
+  return Array(12).fill(0).map(() =>
+    `<div class="bg-white rounded-xl overflow-hidden border-2 border-transparent">
+      <div class="skeleton h-44 w-full"></div>
+      <div class="p-3 space-y-2">
+        <div class="skeleton h-3 w-4/5 rounded"></div>
+        <div class="skeleton h-2.5 w-3/5 rounded"></div>
+        <div class="skeleton h-7 w-full rounded-lg mt-3"></div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function renderPagination() {
+  const container = document.getElementById('props-pagination');
+  const totalPages = Math.ceil(state.propsTotal / 48);
+  const currentPage = Math.floor(state.propsOffset / 48) + 1;
+
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  let pages = [];
+  for (let p = Math.max(1, currentPage - 2); p <= Math.min(totalPages, currentPage + 2); p++) {
+    pages.push(p);
+  }
+
+  container.innerHTML = [
+    currentPage > 1 ? `<button onclick="goToPage(${currentPage - 2})" class="px-3 py-1.5 rounded-lg bg-white border text-sm hover:border-blue-400">← Prev</button>` : '',
+    ...pages.map(p => `<button onclick="goToPage(${p - 1})" class="px-3 py-1.5 rounded-lg text-sm ${p === currentPage ? 'bg-blue-600 text-white border border-blue-600' : 'bg-white border hover:border-blue-400'}">${p}</button>`),
+    currentPage < totalPages ? `<button onclick="goToPage(${currentPage})" class="px-3 py-1.5 rounded-lg bg-white border text-sm hover:border-blue-400">Sig →</button>` : '',
+    `<span class="text-xs text-gray-400 self-center ml-1">${state.propsTotal} propiedades</span>`,
+  ].filter(Boolean).join('');
+}
+
+function goToPage(pageIndex) {
+  state.propsOffset = pageIndex * 48;
+  fetchProperties();
+  document.querySelector('main').scrollTop = 0;
+}
+
+// ─── Lead selection & detail drawer ───────────────────────────────────────────
+async function selectLead(contactId) {
+  // If clicking the same lead, deselect
+  if (state.selectedLead?.contactId === contactId) {
+    state.selectedLead = null;
+    closeDrawer();
+    renderLeads();
+    renderProperties();
+    return;
+  }
+
+  // Find in list first for instant render
+  const found = state.leads.find(l => l.contactId === contactId);
+  if (found) {
+    state.selectedLead = { ...found };
+    renderLeads();
+    renderProperties();
+    openDrawer();
+    renderLeadDetail(state.selectedLead);
+    fetchConversation(contactId);
+    // Also fetch full contact data to get latest custom fields
+    fetchFullContact(contactId);
+  }
+}
+
+async function fetchFullContact(contactId) {
+  try {
+    const contact = await apiFetch(`/crm/api/leads/${contactId}`);
+    if (state.selectedLead?.contactId === contactId) {
+      state.selectedLead = { ...state.selectedLead, ...contact };
+      renderLeadDetail(state.selectedLead);
+      renderProperties();
+      // Also update in leads array
+      const idx = state.leads.findIndex(l => l.contactId === contactId);
+      if (idx >= 0) state.leads[idx] = { ...state.leads[idx], ...contact };
+      renderLeads();
+    }
+  } catch {}
+}
+
+function renderLeadDetail(lead) {
+  document.getElementById('detail-name').textContent = lead.name || 'Sin nombre';
+  const phoneLink = document.getElementById('detail-phone-link');
+  phoneLink.textContent = lead.phone || '—';
+  phoneLink.href = lead.phone ? `https://wa.me/${lead.phone.replace(/\D/g, '')}` : '#';
+
+  const stageCls = STAGE_COLORS[lead.stage] || STAGE_COLORS.default;
+  document.getElementById('detail-stage').textContent = lead.stage || '—';
+  document.getElementById('detail-stage').className = `text-xs px-2 py-0.5 rounded-full ${stageCls}`;
+
+  const score = lead.score_lead?.toLowerCase();
+  const scoreConf = SCORE_CONFIG[score];
+  const scoreBadge = document.getElementById('detail-score-badge');
+  if (scoreConf) {
+    scoreBadge.textContent = scoreConf.label;
+    scoreBadge.className = `text-xs px-2 py-0.5 rounded-full ${scoreConf.cls}`;
+    scoreBadge.classList.remove('hidden');
+  } else {
+    scoreBadge.classList.add('hidden');
+  }
+
+  const criteria = [
+    lead.zona && `📍 ${lead.zona}`,
+    lead.operacion && (lead.operacion.toLowerCase().includes('venta') ? '🔑 Venta' : '🏠 Alquiler'),
+    lead.ambientes && `${lead.ambientes} ambientes`,
+    lead.presupuesto_ia && `💵 USD ${Number(lead.presupuesto_ia).toLocaleString('es-AR')}`,
+  ].filter(Boolean).join('\n');
+  document.getElementById('detail-criteria').textContent = criteria || 'Sin criterios registrados';
+
+  // Assigned property
+  const assignedCard = document.getElementById('detail-assigned-card');
+  const clearBtn = document.getElementById('detail-clear-btn');
+  if (lead.propiedad_tokko_id) {
+    assignedCard.innerHTML = `
+      <div class="p-3">
+        <p class="font-semibold text-sm text-gray-800 leading-tight">${escHtml(lead.titulo_propiedad || 'Propiedad asignada')}</p>
+        <p class="text-xs text-gray-500 mt-0.5">${escHtml(lead.ubicacion_propiedad || '')}</p>
+        ${lead.precio_propiedad ? `<p class="text-xs font-medium text-blue-700 mt-1">${escHtml(lead.precio_propiedad)}</p>` : ''}
+        ${lead.link_propiedad ? `<a href="${escHtml(lead.link_propiedad)}" target="_blank" class="text-xs text-blue-500 hover:underline mt-1 block">Ver ficha →</a>` : ''}
+      </div>`;
+    clearBtn.classList.remove('hidden');
+  } else {
+    assignedCard.innerHTML = '<p class="text-xs text-gray-400 p-3 text-center">Sin propiedad asignada</p>';
+    clearBtn.classList.add('hidden');
+  }
+}
+
+async function fetchConversation(contactId) {
+  document.getElementById('detail-messages').innerHTML = '<div class="text-xs text-gray-400">Cargando mensajes...</div>';
+  try {
+    const messages = await apiFetch(`/admin/api/conversations/${contactId}`);
+    const last3 = (messages || []).slice(-6);
+    if (last3.length === 0) {
+      document.getElementById('detail-messages').innerHTML = '<div class="text-xs text-gray-400">Sin mensajes registrados</div>';
+      return;
+    }
+    document.getElementById('detail-messages').innerHTML = last3.map(msg => {
+      const isOut = msg.direction === 'outbound';
+      return `
+        <div class="flex ${isOut ? 'justify-end' : 'justify-start'}">
+          <div class="msg-bubble ${isOut ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}">
+            ${escHtml((msg.body || '').substring(0, 120))}${msg.body?.length > 120 ? '…' : ''}
+          </div>
+        </div>`;
+    }).join('');
+  } catch {
+    document.getElementById('detail-messages').innerHTML = '<div class="text-xs text-gray-400">No se pudo cargar</div>';
+  }
+}
+
+function openDrawer() {
+  document.getElementById('panel-detail').classList.add('drawer-open');
+}
+
+function closeDrawer() {
+  document.getElementById('panel-detail').classList.remove('drawer-open');
+  state.selectedLead = null;
+}
+
+// ─── Assign / clear property ───────────────────────────────────────────────────
+async function assignProperty(tokkoId) {
+  if (!state.selectedLead || state.assigning) return;
+
+  // If already assigned this property, unassign it
+  if (String(state.selectedLead.propiedad_tokko_id) === String(tokkoId)) {
+    await clearProperty();
+    return;
+  }
+
+  const prop = state.properties.find(p => String(p.tokko_id) === String(tokkoId));
+  if (!prop) return;
+
+  state.assigning = true;
+  // Optimistic update
+  state.selectedLead.propiedad_tokko_id = String(tokkoId);
+  state.selectedLead.titulo_propiedad = prop.titulo;
+  state.selectedLead.precio_propiedad = prop.precio ? `${prop.moneda || 'USD'} ${Number(prop.precio).toLocaleString('es-AR')}` : '';
+  state.selectedLead.ubicacion_propiedad = [prop.barrio, prop.direccion].filter(Boolean).join(', ');
+  state.selectedLead.link_propiedad = prop.ficha_tokko || '';
+  renderProperties();
+  renderLeadDetail(state.selectedLead);
+  const idx = state.leads.findIndex(l => l.contactId === state.selectedLead.contactId);
+  if (idx >= 0) Object.assign(state.leads[idx], state.selectedLead);
+  renderLeads();
+
+  try {
+    await apiFetch(`/crm/api/leads/${state.selectedLead.contactId}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tokko_id: tokkoId,
+        titulo: prop.titulo,
+        precio: prop.precio,
+        moneda: prop.moneda,
+        link: prop.ficha_tokko,
+        ubicacion: [prop.barrio, prop.direccion].filter(Boolean).join(', '),
+      }),
+    });
+    showToast('Propiedad asignada en GHL');
+  } catch (err) {
+    // Rollback
+    state.selectedLead.propiedad_tokko_id = null;
+    renderProperties();
+    renderLeadDetail(state.selectedLead);
+    showToast(err.message, '✕', true);
+  } finally {
+    state.assigning = false;
+  }
+}
+
+async function clearProperty() {
+  if (!state.selectedLead || state.assigning) return;
+  state.assigning = true;
+
+  // Optimistic update
+  const prev = { ...state.selectedLead };
+  state.selectedLead.propiedad_tokko_id = null;
+  state.selectedLead.titulo_propiedad = null;
+  state.selectedLead.precio_propiedad = null;
+  state.selectedLead.ubicacion_propiedad = null;
+  state.selectedLead.link_propiedad = null;
+  renderProperties();
+  renderLeadDetail(state.selectedLead);
+  const idx = state.leads.findIndex(l => l.contactId === state.selectedLead.contactId);
+  if (idx >= 0) Object.assign(state.leads[idx], state.selectedLead);
+  renderLeads();
+
+  try {
+    await apiFetch(`/crm/api/leads/${state.selectedLead.contactId}/assign`, { method: 'DELETE' });
+    showToast('Propiedad eliminada del lead');
+  } catch (err) {
+    Object.assign(state.selectedLead, prev);
+    renderProperties();
+    renderLeadDetail(state.selectedLead);
+    showToast(err.message, '✕', true);
+  } finally {
+    state.assigning = false;
+  }
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let filterTimer;
+function onFilterChange() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => {
+    state.propsOffset = 0;
+    fetchProperties();
+  }, 400);
+}
+
+// ─── Event listeners ──────────────────────────────────────────────────────────
+document.getElementById('lead-search').addEventListener('input', filterLeads);
+document.getElementById('detail-close').addEventListener('click', () => {
+  closeDrawer();
+  renderLeads();
+  renderProperties();
+});
+document.getElementById('detail-clear-btn').addEventListener('click', clearProperty);
+['filter-q', 'filter-barrio', 'filter-precio'].forEach(id =>
+  document.getElementById(id).addEventListener('input', onFilterChange)
+);
+['filter-ambientes', 'filter-operacion'].forEach(id =>
+  document.getElementById(id).addEventListener('change', onFilterChange)
+);
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+fetchLeads();
+fetchProperties();
+</script>
+</body>
+</html>
