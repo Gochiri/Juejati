@@ -256,6 +256,9 @@ function filterLeads() {
       state.leadsHasMore = false;
       state.leadsSearchMode = true;
       renderLeads();
+      const searchIds = state.filteredLeads.map(l => l.contactId).filter(Boolean);
+      fetchPropertyAssignments(searchIds);
+      fetchLeadsActivity(searchIds);
     } catch (err) {
       document.getElementById('leads-count').textContent = err.message || 'Error';
       document.getElementById('leads-list').innerHTML = `<p class="text-xs text-red-500 p-3">${escHtml(err.message)}</p>`;
@@ -355,14 +358,15 @@ async function fetchPropertyAssignments(contactIds) {
     const data = await apiFetch('/crm/api/leads/property-assignments?contactIds=' + contactIds.join(','));
     let changed = false;
     for (const [contactId, fields] of Object.entries(data)) {
+      // Update in state.leads
       const idx = state.leads.findIndex(l => l.contactId === contactId);
-      if (idx >= 0) {
-        Object.assign(state.leads[idx], fields);
-        changed = true;
-        // Update selectedLead too if it's the same contact
-        if (state.selectedLead?.contactId === contactId) {
-          Object.assign(state.selectedLead, fields);
-        }
+      if (idx >= 0) { Object.assign(state.leads[idx], fields); changed = true; }
+      // Update in state.filteredLeads (search mode has different objects)
+      const fidx = state.filteredLeads.findIndex(l => l.contactId === contactId);
+      if (fidx >= 0) { Object.assign(state.filteredLeads[fidx], fields); changed = true; }
+      // Update selectedLead
+      if (state.selectedLead?.contactId === contactId) {
+        Object.assign(state.selectedLead, fields);
       }
     }
     if (changed) { renderProperties(); renderLeads(); }
