@@ -132,9 +132,12 @@ router.get('/crm/api/leads', async (req, res) => {
     let url: string;
     if (query) {
       // Server-side search via GHL contacts search, then filter opportunities
-      url = `${GHL_API_BASE}/contacts/search/duplicate?locationId=${ghlLocationId}&query=${encodeURIComponent(query)}&limit=${limit}`;
+      url = `${GHL_API_BASE}/contacts/?locationId=${ghlLocationId}&query=${encodeURIComponent(query)}&limit=${limit}`;
       const searchRes = await fetch(url, { method: 'GET', headers: GHL_HEADERS });
-      if (!searchRes.ok) throw new Error(`GHL Search Error: ${searchRes.status}`);
+      if (!searchRes.ok) {
+        const body = await searchRes.text();
+        throw new Error(`GHL Search Error: ${searchRes.status} - ${body}`);
+      }
       const searchData = await searchRes.json();
       const contacts = searchData.contacts || [];
       // For each contact found, fetch their opportunity

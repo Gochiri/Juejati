@@ -241,7 +241,8 @@ function filterLeads() {
       state.leadsSearchMode = true;
       renderLeads();
     } catch (err) {
-      document.getElementById('leads-count').textContent = 'Error';
+      document.getElementById('leads-count').textContent = err.message || 'Error';
+      document.getElementById('leads-list').innerHTML = `<p class="text-xs text-red-500 p-3">${escHtml(err.message)}</p>`;
     }
   }, 500);
 }
