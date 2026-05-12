@@ -72,7 +72,10 @@ const GHL_HEADERS = {
 
 function mapOpportunity(opp: any) {
   const contact = opp.contact || {};
-  const customFields: any[] = opp.customFields || contact.customFields || [];
+  const customFields: any[] = [
+    ...(Array.isArray(opp.customFields) ? opp.customFields : []),
+    ...(Array.isArray(contact.customFields) ? contact.customFields : []),
+  ];
   return {
     opportunityId: opp.id,
     contactId: contact.id || opp.contactId,
