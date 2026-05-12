@@ -94,39 +94,30 @@ function mapOpportunity(opp: any) {
   };
 }
 
-// GET /crm/api/leads/property-assignments — batch-fetch propiedad_tokko_id for all contacts
+// GET /crm/api/leads/property-assignments — batch-fetch from Supabase (multi-property)
 router.get('/crm/api/leads/property-assignments', async (req, res) => {
   try {
     const ids = String(req.query.contactIds || '').split(',').filter(Boolean).slice(0, 200);
     if (ids.length === 0) return res.json({});
 
-    // Fetch in parallel batches of 10 to avoid overwhelming GHL
-    const assignments: Record<string, any> = {};
-    const BATCH = 10;
-    for (let i = 0; i < ids.length; i += BATCH) {
-      const batch = ids.slice(i, i + BATCH);
-      await Promise.all(batch.map(async (contactId) => {
-        try {
-          const ghlRes = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
-            method: 'GET', headers: GHL_HEADERS,
-          });
-          if (!ghlRes.ok) return;
-          const data = await ghlRes.json();
-          const contact = data.contact || data;
-          const customFields: any[] = contact.customFields || [];
-          const get = (id: string) => {
-            const f = customFields.find((cf: any) => cf.id === id);
-            return f?.value ?? f?.field_value ?? null;
-          };
-          assignments[contactId] = {
-            propiedad_tokko_id: get(GHL_FIELD_IDS.propiedad_tokko_id),
-            titulo_propiedad: get(GHL_FIELD_IDS.titulo_propiedad) || get(GHL_FIELD_IDS.propiedad_de_interes),
-            precio_propiedad: get(GHL_FIELD_IDS.precio_propiedad),
-            ubicacion_propiedad: get(GHL_FIELD_IDS.ubicacion_propiedad),
-            link_propiedad: get(GHL_FIELD_IDS.link_propiedad),
-          };
-        } catch {}
-      }));
+    const result = await pool.query(
+      `SELECT contact_id, tokko_id, titulo, precio, ubicacion, link
+       FROM lead_property_assignments
+       WHERE contact_id = ANY($1)
+       ORDER BY assigned_at ASC`,
+      [ids]
+    );
+
+    const assignments: Record<string, any[]> = {};
+    for (const row of result.rows) {
+      if (!assignments[row.contact_id]) assignments[row.contact_id] = [];
+      assignments[row.contact_id].push({
+        tokko_id: row.tokko_id,
+        titulo: row.titulo,
+        precio: row.precio,
+        ubicacion: row.ubicacion,
+        link: row.link,
+      });
     }
     res.json(assignments);
   } catch (err: any) {
@@ -321,7 +312,7 @@ router.get('/crm/api/leads/:contactId', async (req, res) => {
   }
 });
 
-// POST /crm/api/leads/:contactId/assign — assign property to lead
+// POST /crm/api/leads/:contactId/assign — add property to lead (multi-property)
 router.post('/crm/api/leads/:contactId/assign', async (req, res) => {
   try {
     const { contactId } = req.params;
@@ -330,13 +321,22 @@ router.post('/crm/api/leads/:contactId/assign', async (req, res) => {
 
     const precioStr = precio ? `${moneda || 'USD'} ${Number(precio).toLocaleString('es-AR')}` : '';
 
+    await pool.query(
+      `INSERT INTO lead_property_assignments (contact_id, tokko_id, titulo, precio, ubicacion, link)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (contact_id, tokko_id) DO NOTHING`,
+      [contactId, String(tokko_id), titulo || '', precioStr, ubicacion || '', link || '']
+    );
+
+    // Sync GHL: propiedad_de_interes = all titles, propiedad_tokko_id = most recent
+    const all = await pool.query(
+      `SELECT titulo, tokko_id FROM lead_property_assignments WHERE contact_id = $1 ORDER BY assigned_at ASC`,
+      [contactId]
+    );
+    const titulos = all.rows.map((r: any) => r.titulo).filter(Boolean).join('\n');
     await updateContactFields(contactId, [
+      { id: GHL_FIELD_IDS.propiedad_de_interes, field_value: titulos },
       { id: GHL_FIELD_IDS.propiedad_tokko_id, field_value: String(tokko_id) },
-      { id: GHL_FIELD_IDS.titulo_propiedad, field_value: titulo || '' },
-      { id: GHL_FIELD_IDS.propiedad_de_interes, field_value: titulo || '' },
-      { id: GHL_FIELD_IDS.precio_propiedad, field_value: precioStr },
-      { id: GHL_FIELD_IDS.ubicacion_propiedad, field_value: ubicacion || '' },
-      { id: GHL_FIELD_IDS.link_propiedad, field_value: link || '' },
     ]);
 
     res.json({ success: true, contactId, tokko_id });
@@ -346,21 +346,47 @@ router.post('/crm/api/leads/:contactId/assign', async (req, res) => {
   }
 });
 
-// DELETE /crm/api/leads/:contactId/assign — clear property from lead
+// DELETE /crm/api/leads/:contactId/assign/:tokkoId — remove specific property from lead
+router.delete('/crm/api/leads/:contactId/assign/:tokkoId', async (req, res) => {
+  try {
+    const { contactId, tokkoId } = req.params;
+
+    await pool.query(
+      `DELETE FROM lead_property_assignments WHERE contact_id = $1 AND tokko_id = $2`,
+      [contactId, tokkoId]
+    );
+
+    const remaining = await pool.query(
+      `SELECT titulo, tokko_id FROM lead_property_assignments WHERE contact_id = $1 ORDER BY assigned_at ASC`,
+      [contactId]
+    );
+    const titulos = remaining.rows.map((r: any) => r.titulo).filter(Boolean).join('\n');
+    const lastId = remaining.rows.at(-1)?.tokko_id || '';
+
+    await updateContactFields(contactId, [
+      { id: GHL_FIELD_IDS.propiedad_de_interes, field_value: titulos },
+      { id: GHL_FIELD_IDS.propiedad_tokko_id, field_value: lastId },
+    ]);
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('CRM remove assignment error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /crm/api/leads/:contactId/assign — clear ALL properties from lead (legacy/fallback)
 router.delete('/crm/api/leads/:contactId/assign', async (req, res) => {
   try {
     const { contactId } = req.params;
+    await pool.query(`DELETE FROM lead_property_assignments WHERE contact_id = $1`, [contactId]);
     await updateContactFields(contactId, [
       { id: GHL_FIELD_IDS.propiedad_tokko_id, field_value: '' },
-      { id: GHL_FIELD_IDS.titulo_propiedad, field_value: '' },
       { id: GHL_FIELD_IDS.propiedad_de_interes, field_value: '' },
-      { id: GHL_FIELD_IDS.precio_propiedad, field_value: '' },
-      { id: GHL_FIELD_IDS.ubicacion_propiedad, field_value: '' },
-      { id: GHL_FIELD_IDS.link_propiedad, field_value: '' },
     ]);
     res.json({ success: true });
   } catch (err: any) {
-    console.error('CRM clear assign error:', err.message);
+    console.error('CRM clear all assign error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

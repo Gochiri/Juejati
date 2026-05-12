@@ -96,15 +96,12 @@
         <div id="detail-criteria" class="text-xs text-gray-500 mt-2 bg-gray-50 rounded-lg p-2 leading-5"></div>
       </section>
 
-      <!-- Assigned property -->
+      <!-- Assigned properties (multi) -->
       <section>
-        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Propiedad asignada</h3>
-        <div id="detail-assigned-card" class="border rounded-xl overflow-hidden bg-gray-50">
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Propiedades asignadas</h3>
+        <div id="detail-assigned-list" class="space-y-2">
           <!-- Filled by JS -->
         </div>
-        <button id="detail-clear-btn" class="mt-2 text-xs text-red-500 hover:text-red-700 hidden">
-          ✕ Quitar propiedad asignada
-        </button>
       </section>
 
       <!-- Conversation preview -->
@@ -284,7 +281,7 @@ function renderLeads() {
     const isSelected = state.selectedLead?.contactId === lead.contactId;
     const score = lead.score_lead?.toLowerCase();
     const scoreConf = SCORE_CONFIG[score] || null;
-    const hasProperty = !!lead.propiedad_tokko_id;
+    const hasProperty = !!(lead.propiedades?.length);
     const stageCls = STAGE_COLORS[lead.stage] || STAGE_COLORS.default;
 
     const criteria = [
@@ -309,7 +306,7 @@ function renderLeads() {
         <div class="flex items-center gap-1.5 mt-2">
           <span class="text-xs px-1.5 py-0.5 rounded-full ${stageCls}">${escHtml(lead.stage || '—')}</span>
         </div>
-        ${hasProperty ? `<div class="text-xs text-green-600 mt-1.5 truncate">🏠 ${escHtml(lead.titulo_propiedad || '')}</div>` : ''}
+        ${hasProperty ? `<div class="text-xs text-green-600 mt-1.5 truncate">🏠 ${lead.propiedades.length > 1 ? `${lead.propiedades.length} propiedades` : escHtml(lead.propiedades[0]?.titulo || '')}</div>` : ''}
         ${(() => {
           const activity = state.leadsActivity[lead.contactId];
           const srcConf = getSourceConfig(lead.source);
@@ -357,16 +354,14 @@ async function fetchPropertyAssignments(contactIds) {
   try {
     const data = await apiFetch('/crm/api/leads/property-assignments?contactIds=' + contactIds.join(','));
     let changed = false;
-    for (const [contactId, fields] of Object.entries(data)) {
-      // Update in state.leads
+    for (const [contactId, props] of Object.entries(data)) {
+      const update = { propiedades: Array.isArray(props) ? props : [] };
       const idx = state.leads.findIndex(l => l.contactId === contactId);
-      if (idx >= 0) { Object.assign(state.leads[idx], fields); changed = true; }
-      // Update in state.filteredLeads (search mode has different objects)
+      if (idx >= 0) { Object.assign(state.leads[idx], update); changed = true; }
       const fidx = state.filteredLeads.findIndex(l => l.contactId === contactId);
-      if (fidx >= 0) { Object.assign(state.filteredLeads[fidx], fields); changed = true; }
-      // Update selectedLead
+      if (fidx >= 0) { Object.assign(state.filteredLeads[fidx], update); changed = true; }
       if (state.selectedLead?.contactId === contactId) {
-        Object.assign(state.selectedLead, fields);
+        Object.assign(state.selectedLead, update);
       }
     }
     if (changed) { renderProperties(); renderLeads(); }
@@ -430,8 +425,7 @@ function renderProperties() {
   }
 
   grid.innerHTML = state.properties.map(prop => {
-    const assignedTokkoId = state.selectedLead?.propiedad_tokko_id;
-    const isAssigned = assignedTokkoId && String(assignedTokkoId) === String(prop.tokko_id);
+    const isAssigned = state.selectedLead?.propiedades?.some(p => String(p.tokko_id) === String(prop.tokko_id));
     const precio = prop.precio ? `${prop.moneda || 'USD'} ${Number(prop.precio).toLocaleString('es-AR')}` : '';
     const details = [
       prop.ambientes && `${prop.ambientes} amb`,
@@ -454,11 +448,18 @@ function renderProperties() {
           ${precio ? `<span class="absolute top-2 right-2 bg-black/65 text-white text-xs font-bold px-2 py-1 rounded-lg">${precio}</span>` : ''}
           ${prop.operacion ? `<span class="absolute top-2 left-2 text-xs px-1.5 py-0.5 rounded-lg font-medium ${prop.operacion.toLowerCase().includes('venta') ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'}">${prop.operacion.toLowerCase().includes('venta') ? 'Venta' : 'Alquiler'}</span>` : ''}
           ${(() => {
-            const interested = state.leads.filter(l => l.propiedad_tokko_id && String(l.propiedad_tokko_id) === String(prop.tokko_id));
-            return interested.length > 0
+            const tid = String(prop.tokko_id);
+            const seen = new Set();
+            let count = 0;
+            for (const l of [...state.leads, ...state.filteredLeads]) {
+              if (seen.has(l.contactId)) continue;
+              seen.add(l.contactId);
+              if (l.propiedades?.some(p => String(p.tokko_id) === tid)) count++;
+            }
+            return count > 0
               ? `<button onclick="showLeadsForProperty(${prop.tokko_id}, event)"
                          class="absolute bottom-2 right-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold w-6 h-6 rounded-full shadow-lg flex items-center justify-center transition-colors">
-                   ${interested.length}
+                   ${count}
                  </button>`
               : '';
           })()}
@@ -475,7 +476,7 @@ function renderProperties() {
             ${hasLead
               ? `<button onclick="assignProperty(${prop.tokko_id})"
                          class="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isAssigned ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700' : 'bg-blue-600 text-white hover:bg-blue-700'}">
-                   ${isAssigned ? 'Asignada ✓' : 'Asignar'}
+                   ${isAssigned ? '✓ Quitar' : 'Asignar'}
                  </button>`
               : `<button disabled class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-400 cursor-not-allowed">Seleccioná un lead</button>`
             }
@@ -558,10 +559,10 @@ async function fetchFullContact(contactId) {
       state.selectedLead = { ...state.selectedLead, ...contact };
       renderLeadDetail(state.selectedLead);
       renderProperties();
-      // Also update in leads array
       const idx = state.leads.findIndex(l => l.contactId === contactId);
       if (idx >= 0) state.leads[idx] = { ...state.leads[idx], ...contact };
       renderLeads();
+      fetchPropertyAssignments([contactId]);
     }
   } catch {}
 }
@@ -595,21 +596,24 @@ function renderLeadDetail(lead) {
   ].filter(Boolean).join('\n');
   document.getElementById('detail-criteria').textContent = criteria || 'Sin criterios registrados';
 
-  // Assigned property
-  const assignedCard = document.getElementById('detail-assigned-card');
-  const clearBtn = document.getElementById('detail-clear-btn');
-  if (lead.propiedad_tokko_id) {
-    assignedCard.innerHTML = `
-      <div class="p-3">
-        <p class="font-semibold text-sm text-gray-800 leading-tight">${escHtml(lead.titulo_propiedad || lead.propiedad_de_interes || 'Sin título')}</p>
-        <p class="text-xs text-gray-500 mt-0.5">${escHtml(lead.ubicacion_propiedad || '')}</p>
-        ${lead.precio_propiedad ? `<p class="text-xs font-medium text-blue-700 mt-1">${escHtml(lead.precio_propiedad)}</p>` : ''}
-        ${lead.link_propiedad ? `<a href="${escHtml(lead.link_propiedad)}" target="_blank" class="text-xs text-blue-500 hover:underline mt-1 block">Ver ficha →</a>` : ''}
-      </div>`;
-    clearBtn.classList.remove('hidden');
+  // Assigned properties list
+  const assignedList = document.getElementById('detail-assigned-list');
+  const props = lead.propiedades || [];
+  if (props.length === 0) {
+    assignedList.innerHTML = '<p class="text-xs text-gray-400 text-center py-3">Sin propiedades asignadas</p>';
   } else {
-    assignedCard.innerHTML = '<p class="text-xs text-gray-400 p-3 text-center">Sin propiedad asignada</p>';
-    clearBtn.classList.add('hidden');
+    assignedList.innerHTML = props.map(p => `
+      <div class="border rounded-xl bg-gray-50 p-2.5 flex gap-2 items-start">
+        <div class="flex-1 min-w-0">
+          <p class="font-medium text-sm text-gray-800 leading-tight truncate">${escHtml(p.titulo || 'Sin título')}</p>
+          ${p.ubicacion ? `<p class="text-xs text-gray-500 mt-0.5 truncate">${escHtml(p.ubicacion)}</p>` : ''}
+          ${p.precio ? `<p class="text-xs font-medium text-blue-700 mt-0.5">${escHtml(p.precio)}</p>` : ''}
+          ${p.link ? `<a href="${escHtml(p.link)}" target="_blank" class="text-xs text-blue-500 hover:underline mt-0.5 block">Ver ficha →</a>` : ''}
+        </div>
+        <button onclick="removeAssignment('${escHtml(String(p.tokko_id))}')"
+                class="text-gray-300 hover:text-red-500 shrink-0 text-lg leading-none transition-colors"
+                title="Quitar propiedad">×</button>
+      </div>`).join('');
   }
 }
 
@@ -661,13 +665,14 @@ function closeDrawer() {
   state.selectedLead = null;
 }
 
-// ─── Assign / clear property ───────────────────────────────────────────────────
+// ─── Assign / remove property ─────────────────────────────────────────────────
 async function assignProperty(tokkoId) {
   if (!state.selectedLead || state.assigning) return;
+  const lead = state.selectedLead;
 
-  // If already assigned this property, unassign it
-  if (String(state.selectedLead.propiedad_tokko_id) === String(tokkoId)) {
-    await clearProperty();
+  // If already assigned, remove it
+  if (lead.propiedades?.some(p => String(p.tokko_id) === String(tokkoId))) {
+    await removeAssignment(tokkoId);
     return;
   }
 
@@ -675,20 +680,23 @@ async function assignProperty(tokkoId) {
   if (!prop) return;
 
   state.assigning = true;
+  const newEntry = {
+    tokko_id: String(tokkoId),
+    titulo: prop.titulo,
+    precio: prop.precio ? `${prop.moneda || 'USD'} ${Number(prop.precio).toLocaleString('es-AR')}` : '',
+    ubicacion: [prop.barrio, prop.direccion].filter(Boolean).join(', '),
+    link: prop.ficha_tokko || '',
+  };
+
   // Optimistic update
-  state.selectedLead.propiedad_tokko_id = String(tokkoId);
-  state.selectedLead.titulo_propiedad = prop.titulo;
-  state.selectedLead.precio_propiedad = prop.precio ? `${prop.moneda || 'USD'} ${Number(prop.precio).toLocaleString('es-AR')}` : '';
-  state.selectedLead.ubicacion_propiedad = [prop.barrio, prop.direccion].filter(Boolean).join(', ');
-  state.selectedLead.link_propiedad = prop.ficha_tokko || '';
+  lead.propiedades = [...(lead.propiedades || []), newEntry];
+  syncLeadToArrays(lead);
   renderProperties();
-  renderLeadDetail(state.selectedLead);
-  const idx = state.leads.findIndex(l => l.contactId === state.selectedLead.contactId);
-  if (idx >= 0) Object.assign(state.leads[idx], state.selectedLead);
+  renderLeadDetail(lead);
   renderLeads();
 
   try {
-    await apiFetch(`/crm/api/leads/${state.selectedLead.contactId}/assign`, {
+    await apiFetch(`/crm/api/leads/${lead.contactId}/assign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -700,46 +708,53 @@ async function assignProperty(tokkoId) {
         ubicacion: [prop.barrio, prop.direccion].filter(Boolean).join(', '),
       }),
     });
-    showToast('Propiedad asignada en GHL');
+    showToast('Propiedad asignada');
   } catch (err) {
-    // Rollback
-    state.selectedLead.propiedad_tokko_id = null;
+    lead.propiedades = lead.propiedades.filter(p => String(p.tokko_id) !== String(tokkoId));
+    syncLeadToArrays(lead);
     renderProperties();
-    renderLeadDetail(state.selectedLead);
+    renderLeadDetail(lead);
+    renderLeads();
     showToast(err.message, '✕', true);
   } finally {
     state.assigning = false;
   }
 }
 
-async function clearProperty() {
+async function removeAssignment(tokkoId) {
   if (!state.selectedLead || state.assigning) return;
+  const lead = state.selectedLead;
   state.assigning = true;
 
+  const prevProps = [...(lead.propiedades || [])];
+
   // Optimistic update
-  const prev = { ...state.selectedLead };
-  state.selectedLead.propiedad_tokko_id = null;
-  state.selectedLead.titulo_propiedad = null;
-  state.selectedLead.precio_propiedad = null;
-  state.selectedLead.ubicacion_propiedad = null;
-  state.selectedLead.link_propiedad = null;
+  lead.propiedades = prevProps.filter(p => String(p.tokko_id) !== String(tokkoId));
+  syncLeadToArrays(lead);
   renderProperties();
-  renderLeadDetail(state.selectedLead);
-  const idx = state.leads.findIndex(l => l.contactId === state.selectedLead.contactId);
-  if (idx >= 0) Object.assign(state.leads[idx], state.selectedLead);
+  renderLeadDetail(lead);
   renderLeads();
 
   try {
-    await apiFetch(`/crm/api/leads/${state.selectedLead.contactId}/assign`, { method: 'DELETE' });
-    showToast('Propiedad eliminada del lead');
+    await apiFetch(`/crm/api/leads/${lead.contactId}/assign/${tokkoId}`, { method: 'DELETE' });
+    showToast('Propiedad eliminada');
   } catch (err) {
-    Object.assign(state.selectedLead, prev);
+    lead.propiedades = prevProps;
+    syncLeadToArrays(lead);
     renderProperties();
-    renderLeadDetail(state.selectedLead);
+    renderLeadDetail(lead);
+    renderLeads();
     showToast(err.message, '✕', true);
   } finally {
     state.assigning = false;
   }
+}
+
+function syncLeadToArrays(lead) {
+  const idx = state.leads.findIndex(l => l.contactId === lead.contactId);
+  if (idx >= 0) Object.assign(state.leads[idx], lead);
+  const fidx = state.filteredLeads.findIndex(l => l.contactId === lead.contactId);
+  if (fidx >= 0) Object.assign(state.filteredLeads[fidx], lead);
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -796,7 +811,13 @@ function onFilterChange() {
 function showLeadsForProperty(tokkoId, event) {
   event.stopPropagation();
   const prop = state.properties.find(p => String(p.tokko_id) === String(tokkoId));
-  const interested = state.leads.filter(l => l.propiedad_tokko_id && String(l.propiedad_tokko_id) === String(tokkoId));
+  const seen = new Set();
+  const interested = [];
+  for (const l of [...state.leads, ...state.filteredLeads]) {
+    if (seen.has(l.contactId)) continue;
+    seen.add(l.contactId);
+    if (l.propiedades?.some(p => String(p.tokko_id) === String(tokkoId))) interested.push(l);
+  }
 
   document.getElementById('popover-title').textContent = prop?.titulo || 'Propiedad';
   document.getElementById('popover-subtitle').textContent =
@@ -835,7 +856,7 @@ document.getElementById('detail-close').addEventListener('click', () => {
   renderLeads();
   renderProperties();
 });
-document.getElementById('detail-clear-btn').addEventListener('click', clearProperty);
+
 ['filter-q', 'filter-barrio', 'filter-precio'].forEach(id =>
   document.getElementById(id).addEventListener('input', onFilterChange)
 );
