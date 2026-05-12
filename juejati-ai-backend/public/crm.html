@@ -351,22 +351,36 @@ async function loadMoreLeads() {
 
 async function fetchPropertyAssignments(contactIds) {
   if (!contactIds.length) return;
-  try {
-    const data = await apiFetch('/crm/api/leads/property-assignments?contactIds=' + contactIds.join(','));
-    let changed = false;
-    for (const [contactId, props] of Object.entries(data)) {
-      const update = { propiedades: Array.isArray(props) ? props : [] };
-      const idx = state.leads.findIndex(l => l.contactId === contactId);
-      if (idx >= 0) { Object.assign(state.leads[idx], update); changed = true; }
-      const fidx = state.filteredLeads.findIndex(l => l.contactId === contactId);
-      if (fidx >= 0) { Object.assign(state.filteredLeads[fidx], update); changed = true; }
-      if (state.selectedLead?.contactId === contactId) {
-        Object.assign(state.selectedLead, update);
-      }
+  let data = {};
+  try { data = await apiFetch('/crm/api/leads/property-assignments?contactIds=' + contactIds.join(',')); } catch {}
+
+  let changed = false;
+  for (const contactId of contactIds) {
+    const supabaseProps = data[contactId]; // array if contact has rows, undefined if not
+    let update;
+    if (Array.isArray(supabaseProps)) {
+      // Supabase has a row for this contact → use it (new system)
+      update = { propiedades: supabaseProps };
+    } else {
+      // Table missing / endpoint failed / contact not in table → fallback to GHL single-property fields
+      const existing = state.leads.find(l => l.contactId === contactId)
+                    || state.filteredLeads.find(l => l.contactId === contactId);
+      update = { propiedades: existing?.propiedad_tokko_id ? [{
+        tokko_id: String(existing.propiedad_tokko_id),
+        titulo:   existing.titulo_propiedad   || '',
+        precio:   existing.precio_propiedad   || '',
+        ubicacion: existing.ubicacion_propiedad || '',
+        link:     existing.link_propiedad     || '',
+      }] : [] };
     }
-    if (changed) { renderProperties(); renderLeads(); }
-    if (state.selectedLead) renderLeadDetail(state.selectedLead);
-  } catch {}
+    const idx = state.leads.findIndex(l => l.contactId === contactId);
+    if (idx >= 0) { Object.assign(state.leads[idx], update); changed = true; }
+    const fidx = state.filteredLeads.findIndex(l => l.contactId === contactId);
+    if (fidx >= 0) { Object.assign(state.filteredLeads[fidx], update); changed = true; }
+    if (state.selectedLead?.contactId === contactId) Object.assign(state.selectedLead, update);
+  }
+  if (changed) { renderProperties(); renderLeads(); }
+  if (state.selectedLead) renderLeadDetail(state.selectedLead);
 }
 
 async function fetchLeadsActivity(contactIds) {
