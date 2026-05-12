@@ -97,12 +97,15 @@ function mapOpportunity(opp: any) {
   };
 }
 
-// GET /crm/api/leads/property-assignments — batch-fetch from Supabase (multi-property)
+// GET /crm/api/leads/property-assignments — Supabase first, GHL contact fallback
 router.get('/crm/api/leads/property-assignments', async (req, res) => {
-  try {
-    const ids = String(req.query.contactIds || '').split(',').filter(Boolean).slice(0, 200);
-    if (ids.length === 0) return res.json({});
+  const ids = String(req.query.contactIds || '').split(',').filter(Boolean).slice(0, 200);
+  if (ids.length === 0) return res.json({});
 
+  const assignments: Record<string, any[]> = {};
+
+  // 1. Try Supabase (table may not exist yet)
+  try {
     const result = await pool.query(
       `SELECT contact_id, tokko_id, titulo, precio, ubicacion, link
        FROM lead_property_assignments
@@ -110,8 +113,6 @@ router.get('/crm/api/leads/property-assignments', async (req, res) => {
        ORDER BY assigned_at ASC`,
       [ids]
     );
-
-    const assignments: Record<string, any[]> = {};
     for (const row of result.rows) {
       if (!assignments[row.contact_id]) assignments[row.contact_id] = [];
       assignments[row.contact_id].push({
@@ -122,11 +123,32 @@ router.get('/crm/api/leads/property-assignments', async (req, res) => {
         link: row.link,
       });
     }
-    res.json(assignments);
-  } catch (err: any) {
-    console.error('CRM property-assignments error:', err.message);
-    res.status(500).json({ error: err.message });
+  } catch {
+    // Table doesn't exist yet — will fall through to GHL for all contacts
   }
+
+  // 2. For contacts not in Supabase, fall back to individual GHL contact fetch
+  const missing = ids.filter(id => !assignments[id]);
+  if (missing.length > 0) {
+    await Promise.all(missing.map(async (contactId) => {
+      try {
+        const contact = await getContactById(contactId);
+        const cf: any[] = contact.customFields || [];
+        const tokkoId = extractFieldValue(cf, GHL_FIELD_IDS.propiedad_tokko_id);
+        if (tokkoId) {
+          assignments[contactId] = [{
+            tokko_id: tokkoId,
+            titulo:   extractFieldValue(cf, GHL_FIELD_IDS.titulo_propiedad)   || '',
+            precio:   extractFieldValue(cf, GHL_FIELD_IDS.precio_propiedad)   || '',
+            ubicacion: extractFieldValue(cf, GHL_FIELD_IDS.ubicacion_propiedad) || '',
+            link:     extractFieldValue(cf, GHL_FIELD_IDS.link_propiedad)     || '',
+          }];
+        }
+      } catch {}
+    }));
+  }
+
+  res.json(assignments);
 });
 
 // GET /crm/api/leads/activity — batch last-message per contact from message_log
