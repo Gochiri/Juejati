@@ -6,7 +6,7 @@
     },
     "playwright": {
       "command": "/opt/node22/bin/playwright-mcp",
-      "args": ["--executable-path", "/usr/bin/chromium-browser", "--headless"]
+      "args": ["--browser", "chromium", "--executable-path", "/usr/bin/chromium-browser", "--headless"]
     }
   }
 }
