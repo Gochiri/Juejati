@@ -16,6 +16,12 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SCRAPER_API_URL=http://zonaprop-scraper:3000/api/search
       - SCRAPER_PUBLIC_URL=https://catalogo.korvance.com
+      - FOLLOWUP_ENABLED=${FOLLOWUP_ENABLED}
+      - FOLLOWUP_INTERVAL_HOURS=3
+      - FOLLOWUP_SILENCE_HOURS=48
+      - FOLLOWUP_MAX_ATTEMPTS=3
+      - FOLLOWUP_MAX_AGE_DAYS=30
+      - FOLLOWUP_MAX_ANALYSES=40
     networks:
       - korvancenet
     deploy:
