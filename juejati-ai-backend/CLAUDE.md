@@ -42,6 +42,7 @@ seed.sql      — Datos de prueba
 |--------|------|-------------|
 | POST | `/webhook/ghl` | Webhook principal de GHL — recibe mensajes entrantes |
 | POST | `/api/followup` | Follow-up para oportunidades sin respuesta (llamado desde workflow GHL) |
+| POST | `/api/followup-cron` | Dispara el cron de seguimiento de leads (Bearer `SYNC_SECRET`) |
 | POST | `/sync` | Dispara sync manual Tokko → Supabase |
 | GET | `/health` | Health check |
 
@@ -78,6 +79,24 @@ El agente usa `generateText` con `maxSteps: 5` y estos tools:
 - Se envían como mensajes separados (attachment-only), no embebidas en el texto
 
 ---
+
+## Cron de seguimiento de leads (`followup.ts`)
+
+Cron autónomo que retoma conversaciones que se enfriaron. Reemplaza al workflow nativo
+SR01 de GHL (que debe desactivarse para evitar mensajes duplicados).
+
+1. Solo corre en horario comercial (lun-vie 9-20, hora Argentina — `isBusinessHours()`)
+2. Lista conversaciones vía `searchConversations()` (`GET /conversations/search`, último mensaje outbound)
+3. Por cada lead: filtra por silencio (≥48h, ≤30d), intentos previos (`lead_followups`) y tags de exclusión
+4. `analyzeLeadConversation()` (`generateObject`) clasifica el lead y decide si seguir y con qué mensaje
+5. Si corresponde → `sendMessage()` + registra en `message_log` y `lead_followups`
+
+- **Scheduler**: `setInterval` cada `FOLLOWUP_INTERVAL_HOURS` (solo si `FOLLOWUP_ENABLED=true`)
+- **Disparo manual**: `POST /api/followup-cron` con Bearer `SYNC_SECRET`
+- **Tags de exclusión**: `detener ia`, `ia desactivada`, `human handover`, `quiere visitar`,
+  `seguimiento_agotado`, `seguimiento_descartado`
+- Al agotar los intentos se añade el tag `seguimiento_agotado`; si la IA decide no seguir, `seguimiento_descartado`
+- **Tabla** `lead_followups`: `contact_id`, `conversation_id`, `attempt`, `status` (`sent`/`skipped`), `reason`, `message`, `created_at`
 
 ## Base de datos (Supabase + pgvector)
 

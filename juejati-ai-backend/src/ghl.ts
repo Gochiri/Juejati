@@ -48,6 +48,50 @@ export async function getConversationHistory(contactId: string, limit = 20) {
   return Array.isArray(msgs) ? msgs : (msgs?.messages || []);
 }
 
+// Searches conversations for the location, paginating via the startAfterDate cursor.
+// Returns raw conversation objects sorted by last message date (newest first).
+export async function searchConversations(opts: {
+  lastMessageDirection?: 'inbound' | 'outbound';
+  maxConversations?: number;
+} = {}): Promise<any[]> {
+  const pageLimit = 100;
+  const maxConversations = opts.maxConversations ?? 800;
+  const all: any[] = [];
+  let startAfterDate: number | undefined;
+
+  while (all.length < maxConversations) {
+    const params = new URLSearchParams({
+      locationId: ghlLocationId || '',
+      sortBy: 'last_message_date',
+      sort: 'desc',
+      status: 'all',
+      limit: String(pageLimit),
+    });
+    if (opts.lastMessageDirection) params.set('lastMessageDirection', opts.lastMessageDirection);
+    if (startAfterDate) params.set('startAfterDate', String(startAfterDate));
+
+    const res = await fetch(`${GHL_API_BASE}/conversations/search?${params}`, { method: 'GET', headers });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`GHL Error searching conversations: ${res.status} ${res.statusText} - ${body}`);
+    }
+    const data = await res.json();
+    const conversations: any[] = data.conversations || [];
+    if (conversations.length === 0) break;
+    all.push(...conversations);
+    if (conversations.length < pageLimit) break;
+
+    // Advance the cursor using the last conversation's last-activity date
+    const last = conversations[conversations.length - 1];
+    const cursor = last.lastMessageDate ?? last.dateUpdated ?? last.dateAdded;
+    const cursorMs = typeof cursor === 'number' ? cursor : Date.parse(cursor || '');
+    if (!cursorMs || cursorMs === startAfterDate) break;
+    startAfterDate = cursorMs;
+  }
+
+  return all.slice(0, maxConversations);
+}
+
 // Maps GHL conversation channel to send API message type
 const GHL_CHANNEL_MAP: Record<string, string> = {
   // Numeric types from message payload

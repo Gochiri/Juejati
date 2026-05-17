@@ -41,9 +41,21 @@ export async function initAdminTables() {
       metadata JSONB DEFAULT '{}',
       created_at TIMESTAMPTZ DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS lead_followups (
+      id BIGSERIAL PRIMARY KEY,
+      contact_id TEXT NOT NULL,
+      conversation_id TEXT,
+      attempt INT NOT NULL,
+      status TEXT NOT NULL,
+      reason TEXT,
+      message TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
     CREATE INDEX IF NOT EXISTS idx_message_log_created_at ON message_log (created_at);
     CREATE INDEX IF NOT EXISTS idx_message_log_contact_id ON message_log (contact_id);
     CREATE INDEX IF NOT EXISTS idx_error_log_created_at ON error_log (created_at);
+    CREATE INDEX IF NOT EXISTS idx_lead_followups_contact ON lead_followups (contact_id);
+    CREATE INDEX IF NOT EXISTS idx_lead_followups_created ON lead_followups (created_at);
   `);
   console.log('✅ Admin tables ready');
 }
@@ -134,6 +146,41 @@ export async function getContactNames(contactIds: string[]): Promise<Record<stri
     map[row.contact_id] = row.name;
   }
   return map;
+}
+
+export interface FollowupRow {
+  id: number;
+  contact_id: string;
+  conversation_id: string | null;
+  attempt: number;
+  status: string;
+  reason: string | null;
+  message: string | null;
+  created_at: string;
+}
+
+export async function recordFollowup(
+  contactId: string,
+  conversationId: string | null,
+  attempt: number,
+  status: 'sent' | 'skipped',
+  reason: string | null,
+  message: string | null
+) {
+  await pool.query(
+    `INSERT INTO lead_followups (contact_id, conversation_id, attempt, status, reason, message)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [contactId, conversationId, attempt, status, reason, message]
+  );
+}
+
+export async function getFollowupHistory(contactId: string): Promise<FollowupRow[]> {
+  const res = await pool.query(
+    `SELECT id, contact_id, conversation_id, attempt, status, reason, message, created_at
+     FROM lead_followups WHERE contact_id = $1 ORDER BY created_at DESC`,
+    [contactId]
+  );
+  return res.rows;
 }
 
 export async function getUsageStats() {

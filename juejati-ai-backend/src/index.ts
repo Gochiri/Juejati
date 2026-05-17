@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { runAgent, handleStaleOpportunity } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
+import { runFollowupCron } from './followup.js';
 import { logMessage, logError, initAdminTables, saveContactName } from './admin-db.js';
 import { getContactName } from './ghl.js';
 import adminRouter from './admin-routes.js';
@@ -181,12 +182,59 @@ setInterval(async () => {
   }
 }, SYNC_INTERVAL_MS);
 
+// Cron de seguimiento de leads: POST /api/followup-cron (disparo manual)
+let followupRunning = false;
+app.post('/api/followup-cron', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!process.env.SYNC_SECRET || token !== process.env.SYNC_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (followupRunning) {
+    return res.status(409).json({ error: 'Follow-up cron already running' });
+  }
+  followupRunning = true;
+  try {
+    const summary = await runFollowupCron();
+    res.json({ success: true, ...summary });
+  } catch (err: any) {
+    console.error('❌ Follow-up cron error:', err);
+    logError('followup-cron', err.message, err.stack).catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally {
+    followupRunning = false;
+  }
+});
+
+// Cron de seguimiento automático
+const FOLLOWUP_ENABLED = process.env.FOLLOWUP_ENABLED === 'true';
+const FOLLOWUP_INTERVAL_MS = (Number(process.env.FOLLOWUP_INTERVAL_HOURS) || 3) * 60 * 60 * 1000;
+if (FOLLOWUP_ENABLED) {
+  setInterval(async () => {
+    if (followupRunning) return;
+    followupRunning = true;
+    try {
+      console.log('⏰ Scheduled follow-up cron starting...');
+      await runFollowupCron();
+    } catch (err: any) {
+      console.error('❌ Scheduled follow-up error:', err);
+      logError('followup-cron', err.message, err.stack).catch(() => {});
+    } finally {
+      followupRunning = false;
+    }
+  }, FOLLOWUP_INTERVAL_MS);
+}
+
 // Initialize admin tables and start server
 initAdminTables()
   .then(() => {
     app.listen(PORT, () => {
       console.log(`🚀 AI Backend listening on port ${PORT}`);
       console.log(`🔄 Property sync scheduled every 6 hours`);
+      console.log(
+        FOLLOWUP_ENABLED
+          ? `📨 Follow-up cron scheduled every ${FOLLOWUP_INTERVAL_MS / 3_600_000}h`
+          : `📨 Follow-up cron disabled (set FOLLOWUP_ENABLED=true to enable)`
+      );
     });
   })
   .catch((err) => {

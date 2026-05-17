@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { generateText, tool, CoreMessage, embed } from 'ai';
+import { generateText, generateObject, tool, CoreMessage, embed } from 'ai';
 import { z } from 'zod';
 import { searchProperties, saveContactImages, getContactImages, PropertyCard } from './db.js';
 import { searchZonaPropScraper, buildCatalogUrl } from './scraper.js';
@@ -493,6 +493,65 @@ export async function runAgent(contactId: string, history: CoreMessage[], userMe
   if (cards.length > 0) cleanText = stripPropertyListings(cleanText);
 
   return { text: cleanText, images: cards };
+}
+
+const FOLLOWUP_ANALYSIS_INSTRUCTIONS = `
+════════════════════ TAREA: ANÁLISIS DE SEGUIMIENTO ════════════════════
+
+No estás respondiendo en vivo. Estás analizando una conversación que quedó SIN
+RESPUESTA del cliente para decidir si corresponde un mensaje de seguimiento.
+
+Analizá el historial y devolvé:
+- estado_lead: clasificación del lead.
+  · "interesado"      → mostró interés concreto, vale la pena reengancharlo.
+  · "frio"            → interés tibio o solo curiosidad, se puede intentar una vez.
+  · "perdido"         → dijo que no le interesa, ya compró/alquiló, o pidió no ser contactado.
+  · "ya_atendido"     → la conversación ya fue tomada por un asesor humano.
+  · "fuera_de_alcance"→ número equivocado, spam, o consulta ajena al negocio inmobiliario.
+- debe_seguir: true SOLO si estado_lead es "interesado" o "frio". false en el resto.
+- motivo: una frase breve explicando la decisión.
+- mensaje: si debe_seguir es true, el texto exacto del follow-up para enviar por WhatsApp
+  (máx. 2 oraciones, en español argentino, retomando el punto donde quedó la charla,
+  amable y no invasivo). Si debe_seguir es false, dejá mensaje vacío ("").
+
+No incluyas títulos, precios ni links de propiedades en el mensaje.
+`;
+
+export async function analyzeLeadConversation(
+  contactId: string,
+  history: CoreMessage[],
+  attempt: number
+): Promise<{ estado_lead: string; debe_seguir: boolean; motivo: string; mensaje: string }> {
+  const systemPrompt = await getSystemPrompt();
+  const modelId = await getModelId();
+
+  const messages: CoreMessage[] = [
+    ...history,
+    {
+      role: 'user',
+      content: `SYSTEM_NOTE (no es un mensaje del cliente): este es el intento de seguimiento N° ${attempt}. El cliente no respondió desde el último mensaje. Analizá la conversación según las instrucciones.`,
+    },
+  ];
+
+  const result = await generateObject({
+    model: openai(modelId),
+    system: `${systemPrompt}\n\n${FOLLOWUP_ANALYSIS_INSTRUCTIONS}`,
+    messages,
+    schema: z.object({
+      estado_lead: z.enum(['interesado', 'frio', 'perdido', 'ya_atendido', 'fuera_de_alcance']),
+      debe_seguir: z.boolean(),
+      motivo: z.string(),
+      mensaje: z.string(),
+    }),
+  });
+
+  const usage = result.usage;
+  if (usage) {
+    const cost = estimateCost(modelId, usage.promptTokens, usage.completionTokens);
+    logUsage(contactId, modelId, usage.promptTokens, usage.completionTokens, cost).catch(() => {});
+  }
+
+  return result.object;
 }
 
 export async function handleStaleOpportunity(contactId: string, history: CoreMessage[]): Promise<{ text: string }> {
