@@ -135,7 +135,7 @@ export async function runFollowupCron(): Promise<FollowupSummary> {
       }
 
       await sendFollowupTemplate(contact.phone, analysis.template_vars);
-      const templateDesc = `[1_seguimiento] nombre=${analysis.template_vars.nombre} cantidad=${analysis.template_vars.cantidad} tipo=${analysis.template_vars.tipo} zona=${analysis.template_vars.zona}`;
+      const templateDesc = `[1_seguimiento] nombre=${analysis.template_vars.nombre} | ${analysis.template_vars.frase}`;
       await logMessage(contactId, 'outbound', templateDesc, 'WhatsApp').catch(() => {});
       await recordFollowup(contactId, conv.id || null, attempt, 'sent', analysis.motivo, templateDesc);
       if (attempt >= MAX_ATTEMPTS) await addContactTag(contactId, 'seguimiento_agotado').catch(() => {});

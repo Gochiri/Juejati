@@ -7,9 +7,7 @@ const META_API_VERSION = process.env.META_API_VERSION || 'v22.0';
 
 export interface FollowupTemplateVars {
   nombre: string;
-  cantidad: string;
-  tipo: string;
-  zona: string;
+  frase: string;
 }
 
 export async function sendFollowupTemplate(
@@ -42,9 +40,7 @@ export async function sendFollowupTemplate(
               type: 'body',
               parameters: [
                 { type: 'text', text: vars.nombre },
-                { type: 'text', text: vars.cantidad },
-                { type: 'text', text: vars.tipo },
-                { type: 'text', text: vars.zona },
+                { type: 'text', text: vars.frase },
               ],
             },
           ],

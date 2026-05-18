@@ -502,7 +502,7 @@ No estás respondiendo en vivo. Estás analizando una conversación que quedó S
 RESPUESTA del cliente para decidir si corresponde un mensaje de seguimiento.
 
 El mensaje se enviará como plantilla de WhatsApp con este texto fijo:
-"Hola {{nombre}} 👋 Soy Sofía de Juejati. La última vez viste {{cantidad}} {{tipo}} en {{zona}} y quedó pendiente coordinar una visita ¿Seguimos buscando?"
+"Hola {{1}} 👋 Soy Sofía de Juejati. {{2}} ¿Seguimos buscando?"
 
 Analizá el historial y devolvé:
 - estado_lead: clasificación del lead.
@@ -514,17 +514,19 @@ Analizá el historial y devolvé:
 - debe_seguir: true SOLO si estado_lead es "interesado" o "frio". false en el resto.
 - motivo: una frase breve explicando la decisión.
 - template_vars: valores para rellenar la plantilla (siempre completar, aunque debe_seguir sea false).
-  · nombre   → primer nombre del cliente extraído de la conversación (si no se sabe, usá "vecino/a").
-  · cantidad → cuántas propiedades consultó, solo el número como texto (ej: "3"). Si no hay dato, "algunas".
-  · tipo     → tipo de propiedad en plural informal (ej: "deptos", "casas", "ph"). Si no hay dato, "propiedades".
-  · zona     → barrio o zona de interés (ej: "Palermo", "la zona norte"). Si no hay dato, "la zona".
+  · nombre → primer nombre del cliente extraído de la conversación. Si no se sabe, usá "vecino/a".
+  · frase  → frase corta (máx. 1 oración) que resume el contexto del lead y retoma la charla.
+             Ejemplos: "La última vez viste 3 deptos en Palermo y quedó pendiente coordinar una visita."
+                       "Estuviste consultando casas en zona norte."
+                       "Viste algunas propiedades que te interesaron."
+             Sin títulos, precios ni links. En español argentino, tono amable.
 `;
 
 export interface FollowupAnalysis {
   estado_lead: 'interesado' | 'frio' | 'perdido' | 'ya_atendido' | 'fuera_de_alcance';
   debe_seguir: boolean;
   motivo: string;
-  template_vars: { nombre: string; cantidad: string; tipo: string; zona: string };
+  template_vars: { nombre: string; frase: string };
 }
 
 export async function analyzeLeadConversation(
@@ -553,9 +555,7 @@ export async function analyzeLeadConversation(
       motivo: z.string(),
       template_vars: z.object({
         nombre: z.string(),
-        cantidad: z.string(),
-        tipo: z.string(),
-        zona: z.string(),
+        frase: z.string(),
       }),
     }),
   });
