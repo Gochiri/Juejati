@@ -501,6 +501,9 @@ const FOLLOWUP_ANALYSIS_INSTRUCTIONS = `
 No estás respondiendo en vivo. Estás analizando una conversación que quedó SIN
 RESPUESTA del cliente para decidir si corresponde un mensaje de seguimiento.
 
+El mensaje se enviará como plantilla de WhatsApp con este texto fijo:
+"Hola {{nombre}} 👋 Soy Sofía de Juejati. La última vez viste {{cantidad}} {{tipo}} en {{zona}} y quedó pendiente coordinar una visita ¿Seguimos buscando?"
+
 Analizá el historial y devolvé:
 - estado_lead: clasificación del lead.
   · "interesado"      → mostró interés concreto, vale la pena reengancharlo.
@@ -510,18 +513,25 @@ Analizá el historial y devolvé:
   · "fuera_de_alcance"→ número equivocado, spam, o consulta ajena al negocio inmobiliario.
 - debe_seguir: true SOLO si estado_lead es "interesado" o "frio". false en el resto.
 - motivo: una frase breve explicando la decisión.
-- mensaje: si debe_seguir es true, el texto exacto del follow-up para enviar por WhatsApp
-  (máx. 2 oraciones, en español argentino, retomando el punto donde quedó la charla,
-  amable y no invasivo). Si debe_seguir es false, dejá mensaje vacío ("").
-
-No incluyas títulos, precios ni links de propiedades en el mensaje.
+- template_vars: valores para rellenar la plantilla (siempre completar, aunque debe_seguir sea false).
+  · nombre   → primer nombre del cliente extraído de la conversación (si no se sabe, usá "vecino/a").
+  · cantidad → cuántas propiedades consultó, solo el número como texto (ej: "3"). Si no hay dato, "algunas".
+  · tipo     → tipo de propiedad en plural informal (ej: "deptos", "casas", "ph"). Si no hay dato, "propiedades".
+  · zona     → barrio o zona de interés (ej: "Palermo", "la zona norte"). Si no hay dato, "la zona".
 `;
+
+export interface FollowupAnalysis {
+  estado_lead: 'interesado' | 'frio' | 'perdido' | 'ya_atendido' | 'fuera_de_alcance';
+  debe_seguir: boolean;
+  motivo: string;
+  template_vars: { nombre: string; cantidad: string; tipo: string; zona: string };
+}
 
 export async function analyzeLeadConversation(
   contactId: string,
   history: CoreMessage[],
   attempt: number
-): Promise<{ estado_lead: string; debe_seguir: boolean; motivo: string; mensaje: string }> {
+): Promise<FollowupAnalysis> {
   const systemPrompt = await getSystemPrompt();
   const modelId = await getModelId();
 
@@ -541,7 +551,12 @@ export async function analyzeLeadConversation(
       estado_lead: z.enum(['interesado', 'frio', 'perdido', 'ya_atendido', 'fuera_de_alcance']),
       debe_seguir: z.boolean(),
       motivo: z.string(),
-      mensaje: z.string(),
+      template_vars: z.object({
+        nombre: z.string(),
+        cantidad: z.string(),
+        tipo: z.string(),
+        zona: z.string(),
+      }),
     }),
   });
 

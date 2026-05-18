@@ -2,11 +2,11 @@ import { CoreMessage } from 'ai';
 import {
   searchConversations,
   getConversationHistory,
-  sendMessage,
   getContactById,
   addContactTag,
 } from './ghl.js';
 import { analyzeLeadConversation } from './agent.js';
+import { sendFollowupTemplate } from './meta.js';
 import { logMessage, logError, recordFollowup, getFollowupHistory } from './admin-db.js';
 
 const SILENCE_HOURS = Number(process.env.FOLLOWUP_SILENCE_HOURS) || 48;
@@ -120,26 +120,28 @@ export async function runFollowupCron(): Promise<FollowupSummary> {
         .filter(m => m.content !== '');
       if (history.length === 0) { summary.skipped++; continue; }
 
+      if (!contact.phone) { summary.skipped++; continue; }
+
       const attempt = sentSinceInbound.length + 1;
       analyses++;
       const analysis = await analyzeLeadConversation(contactId, history, attempt);
 
-      if (!analysis.debe_seguir || !analysis.mensaje.trim()) {
-        await recordFollowup(contactId, conv.id || null, attempt, 'skipped', analysis.motivo, analysis.mensaje);
+      if (!analysis.debe_seguir) {
+        await recordFollowup(contactId, conv.id || null, attempt, 'skipped', analysis.motivo, '');
         await addContactTag(contactId, 'seguimiento_descartado').catch(() => {});
         summary.skipped++;
         console.log(`⏭️  ${contactId}: sin seguimiento (${analysis.estado_lead}) — ${analysis.motivo}`);
         continue;
       }
 
-      const channel = String(conv.lastMessageType || rawHistory[0].messageType || rawHistory[0].type || 'WhatsApp');
-      await sendMessage(contactId, analysis.mensaje, channel, contact.phone || '');
-      await logMessage(contactId, 'outbound', analysis.mensaje, channel).catch(() => {});
-      await recordFollowup(contactId, conv.id || null, attempt, 'sent', analysis.motivo, analysis.mensaje);
+      await sendFollowupTemplate(contact.phone, analysis.template_vars);
+      const templateDesc = `[1_seguimiento] nombre=${analysis.template_vars.nombre} cantidad=${analysis.template_vars.cantidad} tipo=${analysis.template_vars.tipo} zona=${analysis.template_vars.zona}`;
+      await logMessage(contactId, 'outbound', templateDesc, 'WhatsApp').catch(() => {});
+      await recordFollowup(contactId, conv.id || null, attempt, 'sent', analysis.motivo, templateDesc);
       if (attempt >= MAX_ATTEMPTS) await addContactTag(contactId, 'seguimiento_agotado').catch(() => {});
 
       summary.followedUp++;
-      console.log(`✅ Follow-up #${attempt} enviado a ${contactId}`);
+      console.log(`✅ Follow-up #${attempt} enviado a ${contactId} — ${templateDesc}`);
 
       // Light rate-limit between GHL calls
       await new Promise(r => setTimeout(r, 400));
