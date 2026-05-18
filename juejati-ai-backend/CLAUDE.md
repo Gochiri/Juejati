@@ -98,6 +98,30 @@ SR01 de GHL (que debe desactivarse para evitar mensajes duplicados).
 - Al agotar los intentos se añade el tag `seguimiento_agotado`; si la IA decide no seguir, `seguimiento_descartado`
 - **Tabla** `lead_followups`: `contact_id`, `conversation_id`, `attempt`, `status` (`sent`/`skipped`), `reason`, `message`, `created_at`
 
+### ⚠️ Restricción de WhatsApp y redesign de la entrega (pendiente)
+
+La entrega actual vía `sendMessage()` con **texto libre generado por la IA NO funciona**
+fuera de la ventana de servicio de WhatsApp. El número usa la WhatsApp Cloud API oficial:
+pasadas **24 h** desde el último mensaje entrante del lead, Meta solo permite enviar
+**plantillas pre-aprobadas** (HSM), no texto libre. Como el cron apunta a leads con ≥48 h
+de silencio, en la práctica **siempre** cae fuera de la ventana.
+
+**Dirección acordada (Modelo A — el cron maneja la cadencia):**
+
+1. `analyzeLeadConversation()` deja de generar un mensaje libre. La IA analiza la
+   conversación y produce los **valores de las variables de la plantilla**
+   (nombre, zona, cuántas propiedades consultó, si quedó una visita pendiente,
+   última propiedad vista, etc.).
+2. El cron escribe esos valores en **custom fields de GHL** (`updateContactFields`).
+3. El cron **dispara un workflow de GHL** (`POST /contacts/{id}/workflow/{workflowId}`)
+   — falta agregar `addContactToWorkflow()` en `ghl.ts`.
+4. El workflow envía la plantilla, que referencia esos custom fields como variables.
+5. El cron re-analiza antes de cada intento (1/2/3); el conteo y el spacing de 48 h
+   siguen en el código (`lead_followups`), como hoy.
+
+**Bloqueado por inputs del cliente:** texto exacto de la(s) plantilla(s) aprobada(s) y
+sus variables, e ID(s) del workflow de GHL. Sin eso no se puede cerrar el redesign.
+
 ## Base de datos (Supabase + pgvector)
 
 ### Tabla `propiedades_v2`
