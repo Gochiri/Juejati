@@ -85,7 +85,7 @@ El agente usa `generateText` con `maxSteps: 5` y estos tools:
 Cron autónomo que retoma conversaciones que se enfriaron. Reemplaza al workflow nativo
 SR01 de GHL (que debe desactivarse para evitar mensajes duplicados).
 
-1. Solo corre en horario comercial (lun-vie 9-20, hora Argentina — `isBusinessHours()`)
+1. Solo corre en horario comercial (todos los días 9-21, hora Argentina — `isBusinessHours()`)
 2. Lista conversaciones vía `searchConversations()` (`GET /conversations/search`, último mensaje outbound)
 3. Por cada lead: filtra por silencio (≥48h, ≤30d), intentos previos (`lead_followups`) y tags de exclusión
 4. `analyzeLeadConversation()` (`generateObject`) clasifica el lead y decide si seguir y con qué mensaje
