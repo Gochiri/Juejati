@@ -16,7 +16,7 @@ const MAX_ANALYSES_PER_RUN = Number(process.env.FOLLOWUP_MAX_ANALYSES) || 40;
 
 const BUSINESS_TZ = 'America/Argentina/Buenos_Aires';
 const BUSINESS_START = 9;
-const BUSINESS_END = 20;
+const BUSINESS_END = 21;
 
 // Tags that exclude a contact from automated follow-up
 const EXCLUSION_TAGS = [
@@ -36,18 +36,15 @@ export interface FollowupSummary {
   errors: number;
 }
 
-// True on weekdays between 09:00 and 20:00 Argentina time.
+// True every day between 09:00 and 21:00 Argentina time.
 export function isBusinessHours(now: Date = new Date()): boolean {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: BUSINESS_TZ,
-    weekday: 'short',
     hour: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(now);
-  const weekday = parts.find(p => p.type === 'weekday')?.value;
   const hour = Number(parts.find(p => p.type === 'hour')?.value);
-  const isWeekday = weekday !== 'Sat' && weekday !== 'Sun';
-  return isWeekday && hour >= BUSINESS_START && hour < BUSINESS_END;
+  return hour >= BUSINESS_START && hour < BUSINESS_END;
 }
 
 function msgEpoch(m: any): number {
