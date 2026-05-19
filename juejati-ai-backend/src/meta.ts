@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
-const META_PHONE_NUMBER_ID = process.env.META_PHONE_NUMBER_ID || '';
-const META_API_VERSION = process.env.META_API_VERSION || 'v22.0';
+const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || 'v22.0';
 
 export interface FollowupTemplateVars {
   nombre: string;
@@ -14,18 +14,18 @@ export async function sendFollowupTemplate(
   toPhone: string,
   vars: FollowupTemplateVars
 ): Promise<any> {
-  if (!META_ACCESS_TOKEN || !META_PHONE_NUMBER_ID) {
-    throw new Error('META_ACCESS_TOKEN and META_PHONE_NUMBER_ID are required');
+  if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    throw new Error('WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID are required');
   }
 
   const phone = toPhone.replace(/^\+/, '');
 
   const res = await fetch(
-    `https://graph.facebook.com/${META_API_VERSION}/${META_PHONE_NUMBER_ID}/messages`,
+    `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${META_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
