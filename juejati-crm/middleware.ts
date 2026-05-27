@@ -1,5 +1,10 @@
-import { auth } from '@/lib/auth'
+import NextAuth from 'next-auth'
+import { authConfig } from '@/lib/auth.config'
 import { NextResponse } from 'next/server'
+
+// Instancia separada de NextAuth solo con la config edge-safe (sin pg ni bcrypt).
+// Esto evita "edge runtime does not support crypto/pg".
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
