@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { X, ExternalLink, Bot, BotOff } from 'lucide-react'
 import type { GHLContactDetail } from '@/lib/ghl'
+import { AssignPropertyModal } from './AssignPropertyModal'
 
 interface Props {
   contactId: string | null
@@ -25,6 +26,7 @@ export function ContactDetail({ contactId }: Props) {
   const [newTag, setNewTag] = useState('')
   const [tagBusy, setTagBusy] = useState(false)
   const [sofiaBusy, setSofiaBusy] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
   const mountedRef = useRef(true)
   const currentRef = useRef<string | null>(null)
 
@@ -262,9 +264,17 @@ export function ContactDetail({ contactId }: Props) {
 
       {/* Propiedad asignada */}
       <section className="px-4 py-3 border-b border-gray-100">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-          Propiedad asignada
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            Propiedad asignada
+          </h3>
+          <button
+            onClick={() => setAssignOpen(true)}
+            className="text-xs text-blue-600 hover:text-blue-700"
+          >
+            {data.propiedad_tokko_id ? 'Cambiar' : 'Asignar'}
+          </button>
+        </div>
         {data.propiedad_tokko_id ? (
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="font-semibold text-sm text-gray-900 leading-tight">
@@ -303,6 +313,15 @@ export function ContactDetail({ contactId }: Props) {
           Abrir en GHL ↗
         </a>
       </section>
+
+      {assignOpen && contactId && (
+        <AssignPropertyModal
+          contactId={contactId}
+          currentTokkoId={data.propiedad_tokko_id}
+          onClose={() => setAssignOpen(false)}
+          onAssigned={refresh}
+        />
+      )}
     </aside>
   )
 }

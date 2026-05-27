@@ -205,6 +205,22 @@ export async function removeContactTag(contactId: string, tag: string): Promise<
   if (!res.ok) throw new Error(`Remove tag error: ${res.status}`)
 }
 
+export interface Property {
+  tokko_id: number
+  titulo: string
+  barrio: string | null
+  direccion: string | null
+  precio: number | null
+  moneda: string | null
+  ambientes: number | null
+  dormitorios: number | null
+  superficie: number | null
+  imagen: string | null
+  ficha_tokko: string | null
+  operacion: string | null
+  tipo: string | null
+}
+
 export interface GHLContactDetail {
   contactId: string
   name: string
