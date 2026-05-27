@@ -204,3 +204,26 @@ export async function removeContactTag(contactId: string, tag: string): Promise<
   })
   if (!res.ok) throw new Error(`Remove tag error: ${res.status}`)
 }
+
+export interface GHLContactDetail {
+  contactId: string
+  name: string
+  phone: string
+  email: string
+  tags: string[]
+  source: string | null
+  attribution: any
+  dateAdded: string | null
+  zona: string | null
+  operacion: string | null
+  presupuesto_ia: string | null
+  ambientes: string | null
+  dormitorios: string | null
+  tipo_propiedad: string | null
+  score_lead: string | null
+  propiedad_tokko_id: string | null
+  titulo_propiedad: string | null
+  precio_propiedad: string | null
+  ubicacion_propiedad: string | null
+  link_propiedad: string | null
+}
