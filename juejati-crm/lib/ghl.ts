@@ -405,6 +405,37 @@ export async function fetchSocialAccounts(): Promise<GHLSocialAccount[]> {
   }))
 }
 
+// Cache de userId — GHL exige un userId válido al crear posts.
+// Lo resolvemos via env var GHL_DEFAULT_USER_ID, o lo descubrimos pidiendo la lista de users.
+let _cachedUserId: string | null = null
+
+export async function getDefaultGhlUserId(): Promise<string> {
+  if (_cachedUserId) return _cachedUserId
+  if (process.env.GHL_DEFAULT_USER_ID) {
+    _cachedUserId = process.env.GHL_DEFAULT_USER_ID
+    return _cachedUserId
+  }
+  const url = `${GHL_API_BASE}/users/?locationId=${getGhlLocationId()}`
+  const res = await fetch(url, { headers: ghlHeaders() })
+  if (!res.ok) throw new Error(`GHL users error: ${res.status}`)
+  const data = await res.json()
+  const users = data.users || []
+  if (!users.length) throw new Error('No hay usuarios en esta location de GHL')
+  _cachedUserId = users[0].id
+  return _cachedUserId!
+}
+
+function guessMediaType(url: string): string {
+  const lower = url.toLowerCase().split('?')[0]
+  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.gif')) return 'image/gif'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  if (lower.endsWith('.mp4')) return 'video/mp4'
+  if (lower.endsWith('.mov')) return 'video/quicktime'
+  // default: jpeg (Tokko sirve JPGs por defecto)
+  return 'image/jpeg'
+}
+
 export async function fetchSocialPosts(): Promise<GHLSocialPost[]> {
   const url = `${GHL_API_BASE}/social-media-posting/${getGhlLocationId()}/posts/list`
   const res = await fetch(url, {
@@ -434,15 +465,18 @@ export async function createSocialPost(params: {
   scheduleDate: string
   mediaUrl?: string
 }): Promise<{ id: string }> {
+  const userId = await getDefaultGhlUserId()
+
   const body: any = {
     accountIds: params.accountIds,
     summary: params.summary,
     scheduleDate: params.scheduleDate,
     type: 'post',
     status: 'scheduled',
+    userId,
   }
   if (params.mediaUrl) {
-    body.media = [{ url: params.mediaUrl, type: 'image' }]
+    body.media = [{ url: params.mediaUrl, type: guessMediaType(params.mediaUrl) }]
   }
 
   const res = await fetch(`${GHL_API_BASE}/social-media-posting/${getGhlLocationId()}/posts`, {
