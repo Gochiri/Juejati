@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -42,6 +42,7 @@ export default function PipelinePage() {
   const [selectedOpp, setSelectedOpp] = useState<GHLLead | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const draggingRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -109,9 +110,6 @@ export default function PipelinePage() {
     const lead = (active.data.current as any)?.lead as GHLLead | undefined
     if (!fromStageId || !lead || fromStageId === toStageId) return
 
-    // Snapshot for rollback
-    const snapshot = leadsByStage
-
     // Optimistic update
     setLeadsByStage((prev) => {
       const next: Record<string, GHLLead[]> = {}
@@ -135,7 +133,15 @@ export default function PipelinePage() {
         throw new Error(data?.error || `HTTP ${res.status}`)
       }
     } catch (err: any) {
-      setLeadsByStage(snapshot)
+      setLeadsByStage((prev) => {
+        const next: Record<string, GHLLead[]> = {}
+        for (const k of Object.keys(prev)) {
+          next[k] = prev[k].filter((l) => l.opportunityId !== opportunityId)
+        }
+        const restored: GHLLead = { ...lead, stageId: fromStageId }
+        next[fromStageId] = [restored, ...(next[fromStageId] || [])]
+        return next
+      })
       alert('No se pudo mover la oportunidad: ' + (err.message || 'Error'))
     }
   }
@@ -166,7 +172,14 @@ export default function PipelinePage() {
         {loadingMsg && <p className="text-xs text-gray-400">{loadingMsg}</p>}
       </div>
 
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext
+          sensors={sensors}
+          onDragStart={() => { draggingRef.current = true }}
+          onDragEnd={(e) => {
+            handleDragEnd(e)
+            setTimeout(() => { draggingRef.current = false }, 0)
+          }}
+        >
         <div className="flex-1 overflow-x-auto overflow-y-hidden bg-gray-50">
           <div className="flex gap-3 p-4 h-full">
             {columns.map((col) => (
@@ -176,6 +189,7 @@ export default function PipelinePage() {
                 stageName={col.name}
                 leads={leadsByStage[col.key] || []}
                 onCardClick={setSelectedOpp}
+                draggingRef={draggingRef}
               />
             ))}
           </div>
@@ -196,9 +210,10 @@ interface ColumnProps {
   stageName: string
   leads: GHLLead[]
   onCardClick: (lead: GHLLead) => void
+  draggingRef: React.MutableRefObject<boolean>
 }
 
-function KanbanColumn({ stageId, stageName, leads, onCardClick }: ColumnProps) {
+function KanbanColumn({ stageId, stageName, leads, onCardClick, draggingRef }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stageId })
   return (
     <div
@@ -221,6 +236,7 @@ function KanbanColumn({ stageId, stageName, leads, onCardClick }: ColumnProps) {
               lead={lead}
               fromStageId={stageId}
               onClick={() => onCardClick(lead)}
+              draggingRef={draggingRef}
             />
           ))
         )}
@@ -233,12 +249,14 @@ interface CardProps {
   lead: GHLLead
   fromStageId: string
   onClick: () => void
+  draggingRef: React.MutableRefObject<boolean>
 }
 
-function DraggableCard({ lead, fromStageId, onClick }: CardProps) {
+function DraggableCard({ lead, fromStageId, onClick, draggingRef }: CardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lead.opportunityId,
     data: { fromStageId, lead },
+    disabled: !lead.opportunityId,
   })
   const score = lead.score_lead?.toLowerCase()
   const dotClass = score ? SCORE_DOT[score] : null
@@ -259,7 +277,7 @@ function DraggableCard({ lead, fromStageId, onClick }: CardProps) {
       {...attributes}
       onClick={(e) => {
         // Suppress click that came from a drag (dnd-kit fires click on pointerup of short drags)
-        if (isDragging) return
+        if (draggingRef.current) return
         e.stopPropagation()
         onClick()
       }}
