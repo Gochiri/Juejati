@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   output: 'standalone',
+  env: {
+    NEXT_PUBLIC_GHL_LOCATION_ID: process.env.GHL_LOCATION_ID,
+  },
   images: {
     remotePatterns: [
       // Tokko Broker CDN (fotos de propiedades)
