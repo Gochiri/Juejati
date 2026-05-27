@@ -1,4 +1,4 @@
-import { GHL_API_BASE, GHL_LOCATION_ID, ghlHeaders, extractFieldValue, GHL_FIELD_IDS } from './ghl-fields'
+import { GHL_API_BASE, getGhlLocationId, ghlHeaders, extractFieldValue, GHL_FIELD_IDS } from './ghl-fields'
 
 export interface GHLLead {
   opportunityId: string
@@ -64,7 +64,7 @@ export async function fetchLeads(params: {
   const { q, page = 1, limit = 50 } = params
 
   if (q) {
-    const url = `${GHL_API_BASE}/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(q)}&limit=${limit}`
+    const url = `${GHL_API_BASE}/contacts/?locationId=${getGhlLocationId()}&query=${encodeURIComponent(q)}&limit=${limit}`
     const res = await fetch(url, { headers: ghlHeaders() })
     if (!res.ok) throw new Error(`GHL search error: ${res.status}`)
     const data = await res.json()
@@ -96,7 +96,7 @@ export async function fetchLeads(params: {
     return { leads, total: data.meta?.total || leads.length, hasMore: false }
   }
 
-  const url = `${GHL_API_BASE}/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=${limit}&page=${page}`
+  const url = `${GHL_API_BASE}/opportunities/search?location_id=${getGhlLocationId()}&limit=${limit}&page=${page}`
   const res = await fetch(url, { headers: ghlHeaders() })
   if (!res.ok) throw new Error(`GHL leads error: ${res.status}`)
   const data = await res.json()
@@ -116,7 +116,7 @@ export async function fetchContact(contactId: string): Promise<any> {
 export async function fetchConversationMessages(contactId: string, limit = 20): Promise<GHLMessage[]> {
   // First find the conversation for this contact
   const convRes = await fetch(
-    `${GHL_API_BASE}/conversations/search?locationId=${GHL_LOCATION_ID}&contactId=${contactId}&limit=1`,
+    `${GHL_API_BASE}/conversations/search?locationId=${getGhlLocationId()}&contactId=${contactId}&limit=1`,
     { headers: ghlHeaders() }
   )
   if (!convRes.ok) return []
@@ -144,7 +144,7 @@ export async function fetchConversationMessages(contactId: string, limit = 20): 
 export async function sendMessage(contactId: string, text: string): Promise<void> {
   // Find conversation ID first
   const convRes = await fetch(
-    `${GHL_API_BASE}/conversations/search?locationId=${GHL_LOCATION_ID}&contactId=${contactId}&limit=1`,
+    `${GHL_API_BASE}/conversations/search?locationId=${getGhlLocationId()}&contactId=${contactId}&limit=1`,
     { headers: ghlHeaders() }
   )
   if (!convRes.ok) throw new Error('Cannot find conversation')
