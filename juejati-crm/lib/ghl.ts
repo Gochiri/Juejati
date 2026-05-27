@@ -7,6 +7,8 @@ export interface GHLLead {
   phone: string
   email?: string
   stage: string
+  stageId?: string
+  pipelineId?: string
   source?: string
   createdAt?: string
   score_lead?: string | null
@@ -40,6 +42,8 @@ function mapOpportunity(opp: any): GHLLead {
     phone: contact.phone || '',
     email: contact.email || '',
     stage: opp.stage?.name || opp.pipelineStage || '',
+    stageId: opp.pipelineStageId || opp.stage?.id || '',
+    pipelineId: opp.pipelineId || '',
     source: opp.source || contact.source || null,
     createdAt: opp.createdAt || opp.dateAdded || null,
     score_lead: get(GHL_FIELD_IDS.score_lead),

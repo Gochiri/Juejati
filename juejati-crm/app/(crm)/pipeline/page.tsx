@@ -41,17 +41,20 @@ export default function PipelinePage() {
         const lData = await lRes.json()
         const allLeads: GHLLead[] = lData.leads || []
 
+        // Agrupar por stageId (UUID). GHL devuelve pipelineStageId, no el nombre.
         const grouped: Record<string, GHLLead[]> = {}
+        const validStageIds = new Set<string>()
         firstPipeline.stages.forEach((s: Stage) => {
-          grouped[s.name] = []
+          grouped[s.id] = []
+          validStageIds.add(s.id)
         })
         for (const lead of allLeads) {
-          const stageName = lead.stage || ''
-          if (grouped[stageName]) {
-            grouped[stageName].push(lead)
+          const sid = lead.stageId || ''
+          if (sid && validStageIds.has(sid)) {
+            grouped[sid].push(lead)
           } else {
-            if (!grouped['Sin etapa']) grouped['Sin etapa'] = []
-            grouped['Sin etapa'].push(lead)
+            if (!grouped['__sin_etapa__']) grouped['__sin_etapa__'] = []
+            grouped['__sin_etapa__'].push(lead)
           }
         }
         setLeadsByStage(grouped)
@@ -74,8 +77,10 @@ export default function PipelinePage() {
 
   if (!pipeline) return null
 
-  const allStages = [...pipeline.stages.map((s) => s.name)]
-  if (leadsByStage['Sin etapa']?.length > 0) allStages.push('Sin etapa')
+  const columns: { key: string; name: string }[] = pipeline.stages.map((s) => ({ key: s.id, name: s.name }))
+  if (leadsByStage['__sin_etapa__']?.length > 0) {
+    columns.push({ key: '__sin_etapa__', name: 'Sin etapa' })
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -88,11 +93,12 @@ export default function PipelinePage() {
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden bg-gray-50">
         <div className="flex gap-3 p-4 h-full">
-          {allStages.map((stageName) => {
-            const leads = leadsByStage[stageName] || []
+          {columns.map((col) => {
+            const leads = leadsByStage[col.key] || []
+            const stageName = col.name
             return (
               <div
-                key={stageName}
+                key={col.key}
                 className="w-72 shrink-0 bg-gray-100 rounded-xl p-2 flex flex-col h-full"
               >
                 <div className="px-2 py-1.5 flex items-center justify-between shrink-0">
