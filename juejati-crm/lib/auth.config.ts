@@ -3,6 +3,9 @@
 import type { NextAuthConfig } from 'next-auth'
 
 export const authConfig = {
+  // Necesario al correr detrás de un reverse proxy (Traefik en Docker Swarm).
+  // Sin esto, NextAuth v5 rechaza la URL con UntrustedHost.
+  trustHost: true,
   pages: { signIn: '/login' },
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
   providers: [], // los providers reales se agregan en auth.ts (node runtime)
