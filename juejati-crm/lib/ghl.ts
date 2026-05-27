@@ -457,3 +457,18 @@ export async function createSocialPost(params: {
   const data = await res.json()
   return { id: data.id || data.post?.id || data._id }
 }
+
+export async function updateOpportunityStage(
+  opportunityId: string,
+  stageId: string,
+): Promise<void> {
+  const res = await fetch(`${GHL_API_BASE}/opportunities/${opportunityId}`, {
+    method: 'PUT',
+    headers: ghlHeaders(),
+    body: JSON.stringify({ pipelineStageId: stageId }),
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Update opportunity stage error: ${res.status} ${err}`)
+  }
+}
