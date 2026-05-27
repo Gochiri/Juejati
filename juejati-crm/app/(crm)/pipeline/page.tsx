@@ -15,9 +15,9 @@ interface Pipeline {
 }
 
 const SCORE_DOT: Record<string, string> = {
-  frio: 'bg-blue-400',
-  tibio: 'bg-yellow-400',
-  caliente: 'bg-red-400',
+  frio: 'bg-info',
+  tibio: 'bg-warning',
+  caliente: 'bg-danger',
 }
 
 export default function PipelinePage() {
@@ -41,7 +41,6 @@ export default function PipelinePage() {
         const lData = await lRes.json()
         const allLeads: GHLLead[] = lData.leads || []
 
-        // Agrupar por stageId (UUID). GHL devuelve pipelineStageId, no el nombre.
         const grouped: Record<string, GHLLead[]> = {}
         const validStageIds = new Set<string>()
         firstPipeline.stages.forEach((s: Stage) => {
@@ -68,11 +67,11 @@ export default function PipelinePage() {
   }, [])
 
   if (loading) {
-    return <div className="h-full flex items-center justify-center text-gray-400">Cargando pipeline...</div>
+    return <div className="h-full flex items-center justify-center text-fg-subtle">Cargando pipeline...</div>
   }
 
   if (error) {
-    return <div className="h-full flex items-center justify-center text-red-500">{error}</div>
+    return <div className="h-full flex items-center justify-center text-danger">{error}</div>
   }
 
   if (!pipeline) return null
@@ -82,16 +81,18 @@ export default function PipelinePage() {
     columns.push({ key: '__sin_etapa__', name: 'Sin etapa' })
   }
 
+  const totalLeads = Object.values(leadsByStage).reduce((acc, arr) => acc + arr.length, 0)
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="px-4 py-3 bg-white border-b border-gray-200 shrink-0">
-        <h1 className="font-bold text-lg">Pipeline — {pipeline.name}</h1>
-        <p className="text-xs text-gray-400">
-          {Object.values(leadsByStage).reduce((acc, arr) => acc + arr.length, 0)} leads
+      <div className="px-4 py-3 bg-surface border-b border-border shrink-0">
+        <h1 className="font-medium text-fg text-lg">Pipeline — {pipeline.name}</h1>
+        <p className="text-2xs font-mono tabular-nums text-fg-muted">
+          {totalLeads} leads
         </p>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-gray-50">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-bg">
         <div className="flex gap-3 p-4 h-full">
           {columns.map((col) => {
             const leads = leadsByStage[col.key] || []
@@ -99,17 +100,17 @@ export default function PipelinePage() {
             return (
               <div
                 key={col.key}
-                className="w-72 shrink-0 bg-gray-100 rounded-xl p-2 flex flex-col h-full"
+                className="w-72 shrink-0 bg-surface border border-border rounded-lg flex flex-col h-full"
               >
-                <div className="px-2 py-1.5 flex items-center justify-between shrink-0">
-                  <h3 className="font-semibold text-sm text-gray-700">{stageName}</h3>
-                  <span className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded">
+                <div className="px-2.5 py-2 flex items-center justify-between shrink-0 border-b border-border">
+                  <h3 className="font-medium text-sm text-fg">{stageName}</h3>
+                  <span className="text-2xs text-fg-muted font-mono tabular-nums bg-surface-2 px-1.5 py-0.5 rounded">
                     {leads.length}
                   </span>
                 </div>
-                <div className="overflow-y-auto flex-1 space-y-2 px-1 py-1">
+                <div className="overflow-y-auto flex-1 space-y-2 px-2 py-2">
                   {leads.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-4">Sin leads</p>
+                    <p className="text-2xs text-fg-subtle text-center py-4">Sin leads</p>
                   ) : (
                     leads.map((lead) => {
                       const score = lead.score_lead?.toLowerCase()
@@ -121,18 +122,18 @@ export default function PipelinePage() {
                       return (
                         <div
                           key={lead.contactId}
-                          className="bg-white rounded-lg p-3 shadow-sm border border-gray-100 hover:border-blue-300 hover:shadow transition cursor-pointer"
+                          className="bg-bg rounded-md p-2.5 border border-border hover:border-border-strong transition-colors cursor-pointer"
                         >
                           <div className="flex items-start gap-2">
                             {dotClass && (
                               <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${dotClass}`} />
                             )}
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-gray-900 truncate">{lead.name}</p>
-                              <p className="text-xs text-gray-500">{lead.phone || '—'}</p>
-                              {criteria && <p className="text-xs text-gray-400 mt-1 truncate">{criteria}</p>}
+                              <p className="font-medium text-sm text-fg truncate">{lead.name}</p>
+                              <p className="text-2xs font-mono tabular-nums text-fg-muted">{lead.phone || '—'}</p>
+                              {criteria && <p className="text-2xs text-fg-subtle mt-1 truncate">{criteria}</p>}
                               {lead.propiedad_tokko_id && (
-                                <p className="text-xs text-green-600 mt-1 truncate">
+                                <p className="text-2xs text-success mt-1 truncate">
                                   🏠 {lead.titulo_propiedad || 'Propiedad asignada'}
                                 </p>
                               )}

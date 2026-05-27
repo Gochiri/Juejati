@@ -69,8 +69,8 @@ export function LeadList({ selectedId, onSelect }: Props) {
   }
 
   return (
-    <aside className="w-72 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
-      <div className="p-3 border-b border-gray-100">
+    <aside className="w-72 bg-surface border-r border-border flex flex-col h-full shrink-0">
+      <div className="p-3 border-b border-border">
         <Input
           placeholder="Buscar lead..."
           value={query}
@@ -79,21 +79,21 @@ export function LeadList({ selectedId, onSelect }: Props) {
         <select
           value={selectedStage}
           onChange={(e) => onStageChange(e.target.value)}
-          className="w-full mt-2 h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+          className="w-full mt-2 h-9 rounded-md border border-border bg-surface px-3 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
         >
           <option value="">Todas las etapas</option>
           {stages.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        <p className="text-xs text-gray-400 mt-1.5 px-1">
+        <p className="text-2xs font-mono tabular-nums text-fg-subtle mt-1.5 px-1">
           {loading ? 'Cargando...' : `${leads.length} de ${total} leads`}
         </p>
       </div>
       <div className="overflow-y-auto flex-1 p-2 space-y-1.5">
-        {error && <p className="text-xs text-red-500 p-3">{error}</p>}
+        {error && <p className="text-xs text-danger p-3">{error}</p>}
         {!loading && !error && leads.length === 0 && (
-          <p className="text-xs text-gray-400 p-3 text-center">Sin resultados</p>
+          <p className="text-xs text-fg-subtle p-3 text-center">Sin resultados</p>
         )}
         {leads.map((lead) => (
           <LeadCard

@@ -95,12 +95,14 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
     }
   }
 
+  const selectCls = 'w-full h-9 rounded-md border border-border bg-surface px-3 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand'
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-bold text-lg">Nueva visita</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+      <div className="bg-surface border border-border rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="font-medium text-lg text-fg">Nueva visita</h2>
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -112,7 +114,7 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
               value={calendarId}
               onChange={(e) => setCalendarId(e.target.value)}
               required
-              className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+              className={selectCls}
             >
               <option value="">Seleccioná un calendario</option>
               {calendars.map((c) => (
@@ -124,8 +126,8 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
           <div className="space-y-2">
             <Label>Lead / Contacto</Label>
             {preselectedLead ? (
-              <div className="px-3 py-2 bg-blue-50 rounded-md text-sm">
-                <span className="font-semibold">{preselectedLead.name}</span>
+              <div className="px-3 py-2 bg-brand/10 rounded-md text-sm">
+                <span className="font-medium text-fg">{preselectedLead.name}</span>
               </div>
             ) : (
               <div className="relative">
@@ -136,7 +138,7 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
                   required
                 />
                 {leadResults.length > 0 && !contactId && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  <div className="absolute z-10 w-full mt-1 bg-surface border border-border rounded-md max-h-48 overflow-y-auto">
                     {leadResults.map((lead) => (
                       <button
                         key={lead.contactId}
@@ -146,15 +148,15 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
                           setContactName(lead.name)
                           setLeadResults([])
                         }}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-surface-2"
                       >
-                        <p className="font-medium">{lead.name}</p>
-                        <p className="text-xs text-gray-500">{lead.phone}</p>
+                        <p className="font-medium text-fg">{lead.name}</p>
+                        <p className="text-2xs font-mono tabular-nums text-fg-muted">{lead.phone}</p>
                       </button>
                     ))}
                   </div>
                 )}
-                {searchingLead && <p className="text-xs text-gray-400 mt-1">Buscando...</p>}
+                {searchingLead && <p className="text-2xs text-fg-subtle mt-1">Buscando...</p>}
               </div>
             )}
           </div>
@@ -178,7 +180,7 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
               <select
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+                className={selectCls}
               >
                 <option value="30">30 min</option>
                 <option value="60">1 hora</option>
@@ -198,7 +200,7 @@ export function CreateAppointmentModal({ onClose, onCreated, preselectedLead }: 
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>

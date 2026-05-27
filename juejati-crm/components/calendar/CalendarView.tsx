@@ -67,11 +67,11 @@ export function CalendarView({ onCreateClick, onEventClick, refreshKey }: Props)
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-border shrink-0">
         <Button variant="outline" size="icon" onClick={prevMonth}>
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <h2 className="font-bold text-lg capitalize flex-1">{formatMonth(currentMonth)}</h2>
+        <h2 className="font-medium text-lg capitalize flex-1 text-fg">{formatMonth(currentMonth)}</h2>
         <Button variant="outline" size="icon" onClick={nextMonth}>
           <ChevronRight className="w-4 h-4" />
         </Button>
@@ -91,18 +91,18 @@ export function CalendarView({ onCreateClick, onEventClick, refreshKey }: Props)
         </Button>
       </div>
 
-      {error && <p className="text-sm text-red-500 px-4 py-2">{error}</p>}
-      {loading && <p className="text-sm text-gray-400 px-4 py-1">Cargando...</p>}
+      {error && <p className="text-sm text-danger px-4 py-2">{error}</p>}
+      {loading && <p className="text-sm text-fg-subtle px-4 py-1">Cargando...</p>}
 
-      <div className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="grid grid-cols-7 sticky top-0 bg-white border-b border-gray-200">
+      <div className="flex-1 overflow-y-auto bg-bg">
+        <div className="grid grid-cols-7 sticky top-0 bg-surface border-b border-border">
           {WEEKDAYS.map((d) => (
-            <div key={d} className="text-xs font-semibold text-gray-500 text-center py-2 uppercase tracking-wide">
+            <div key={d} className="text-2xs font-medium text-fg-muted text-center py-2 uppercase tracking-wide">
               {d}
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-px bg-gray-200 p-px">
+        <div className="grid grid-cols-7 gap-px bg-border p-px">
           {days.map((day, i) => {
             const inMonth = day.getMonth() === currentMonth.getMonth()
             const isToday = isSameDay(day, today)
@@ -110,14 +110,14 @@ export function CalendarView({ onCreateClick, onEventClick, refreshKey }: Props)
             return (
               <div
                 key={i}
-                className={`min-h-[100px] bg-white p-1.5 ${!inMonth ? 'opacity-40' : ''}`}
+                className={`min-h-[100px] bg-surface p-1.5 ${!inMonth ? 'opacity-40' : ''}`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span
-                    className={`text-xs font-medium ${
+                    className={`text-2xs font-mono tabular-nums font-medium ${
                       isToday
-                        ? 'bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center'
-                        : 'text-gray-700'
+                        ? 'bg-brand text-brand-fg rounded-full w-5 h-5 flex items-center justify-center'
+                        : 'text-fg'
                     }`}
                   >
                     {day.getDate()}
@@ -128,13 +128,13 @@ export function CalendarView({ onCreateClick, onEventClick, refreshKey }: Props)
                     <button
                       key={event.id}
                       onClick={() => onEventClick(event)}
-                      className="block w-full text-left px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-xs truncate hover:bg-blue-200 transition-colors"
+                      className="block w-full text-left px-1.5 py-0.5 rounded bg-brand/15 text-brand text-2xs truncate hover:bg-brand/25 transition-colors"
                     >
-                      {formatTime(event.startTime)} {event.title}
+                      <span className="font-mono tabular-nums">{formatTime(event.startTime)}</span> {event.title}
                     </button>
                   ))}
                   {dayEvents.length > 3 && (
-                    <p className="text-xs text-gray-400 px-1.5">+{dayEvents.length - 3} más</p>
+                    <p className="text-2xs text-fg-subtle px-1.5">+{dayEvents.length - 3} más</p>
                   )}
                 </div>
               </div>

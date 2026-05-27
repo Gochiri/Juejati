@@ -32,10 +32,10 @@ function platformIcon(platform: string) {
 
 export function SocialPostList({ posts, accounts, loading }: Props) {
   if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-8">Cargando posts...</p>
+    return <p className="text-sm text-fg-subtle text-center py-8">Cargando posts...</p>
   }
   if (posts.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-8">Sin posts. Creá el primero arriba.</p>
+    return <p className="text-sm text-fg-subtle text-center py-8">Sin posts. Creá el primero arriba.</p>
   }
 
   return (
@@ -51,22 +51,22 @@ export function SocialPostList({ posts, accounts, loading }: Props) {
         const variant = STATUS_VARIANT[post.status] || 'default'
 
         return (
-          <div key={post.id} className="bg-white rounded-xl border border-gray-200 p-4 flex gap-4">
+          <div key={post.id} className="bg-surface rounded-lg border border-border p-4 flex gap-4">
             {post.mediaUrls[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={post.mediaUrls[0]} alt="" className="w-24 h-24 rounded-lg object-cover shrink-0" />
+              <img src={post.mediaUrls[0]} alt="" className="w-24 h-24 rounded-md object-cover shrink-0" />
             ) : (
-              <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+              <div className="w-24 h-24 rounded-md bg-surface-2 flex items-center justify-center shrink-0">
                 <span className="text-3xl">📷</span>
               </div>
             )}
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 mb-1">
-                <p className="text-sm text-gray-900 line-clamp-2">{post.summary || 'Sin texto'}</p>
+                <p className="text-sm text-fg line-clamp-2">{post.summary || 'Sin texto'}</p>
                 <Badge variant={variant}>{STATUS_LABEL[post.status] || post.status}</Badge>
               </div>
-              <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
+              <div className="flex items-center gap-3 mt-2 text-2xs text-fg-muted">
+                <div className="flex items-center gap-1 font-mono tabular-nums">
                   <Calendar className="w-3 h-3" />
                   {dateStr}
                 </div>

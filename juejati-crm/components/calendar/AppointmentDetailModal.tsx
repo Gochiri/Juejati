@@ -19,10 +19,10 @@ export function AppointmentDetailModal({ appointment, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-bold text-lg truncate pr-2">{appointment.title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0">
+      <div className="bg-surface border border-border rounded-lg w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="font-medium text-lg text-fg truncate pr-2">{appointment.title}</h2>
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -30,7 +30,7 @@ export function AppointmentDetailModal({ appointment, onClose }: Props) {
         <div className="p-5 space-y-4">
           <Row icon={<Calendar className="w-4 h-4" />} label="Fecha">
             <span className="capitalize">{dateStr}</span>
-            <span className="text-gray-500 ml-2">{formatTime(appointment.startTime)} – {formatTime(appointment.endTime)}</span>
+            <span className="text-fg-muted ml-2 font-mono tabular-nums">{formatTime(appointment.startTime)} – {formatTime(appointment.endTime)}</span>
           </Row>
 
           {appointment.contactId && (
@@ -39,7 +39,7 @@ export function AppointmentDetailModal({ appointment, onClose }: Props) {
                 href={`https://app.gohighlevel.com/v2/location/${process.env.NEXT_PUBLIC_GHL_LOCATION_ID || ''}/contacts/detail/${appointment.contactId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-brand hover:underline"
               >
                 Ver en GHL ↗
               </a>
@@ -59,10 +59,10 @@ export function AppointmentDetailModal({ appointment, onClose }: Props) {
           )}
 
           <div className="flex items-center gap-2 pt-2">
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              appointment.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-              appointment.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-              'bg-gray-100 text-gray-700'
+            <span className={`text-2xs px-2 py-0.5 rounded font-medium ${
+              appointment.status === 'confirmed' ? 'bg-success/15 text-success' :
+              appointment.status === 'cancelled' ? 'bg-danger/12 text-danger' :
+              'bg-surface-2 text-fg-muted'
             }`}>
               {appointment.status}
             </span>
@@ -76,10 +76,10 @@ export function AppointmentDetailModal({ appointment, onClose }: Props) {
 function Row({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="text-gray-400 mt-0.5">{icon}</div>
+      <div className="text-fg-subtle mt-0.5">{icon}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
-        <div className="text-sm text-gray-900 mt-0.5">{children}</div>
+        <p className="text-2xs text-fg-subtle uppercase tracking-wide">{label}</p>
+        <div className="text-sm text-fg mt-0.5">{children}</div>
       </div>
     </div>
   )

@@ -19,8 +19,10 @@ export function PropertyFilters({ values, onChange }: Props) {
     onChange({ ...values, [key]: value })
   }
 
+  const selectCls = 'h-9 rounded-md border border-border bg-surface px-3 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand'
+
   return (
-    <div className="flex flex-wrap items-center gap-2 bg-white border-b border-gray-200 px-4 py-3 shrink-0">
+    <div className="flex flex-wrap items-center gap-2 bg-surface border-b border-border px-4 py-3 shrink-0">
       <Input
         placeholder="Buscar propiedad..."
         value={values.q}
@@ -36,7 +38,7 @@ export function PropertyFilters({ values, onChange }: Props) {
       <select
         value={values.ambientes}
         onChange={(e) => update('ambientes', e.target.value)}
-        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+        className={selectCls}
       >
         <option value="">Ambientes</option>
         <option value="1">1 amb</option>
@@ -48,7 +50,7 @@ export function PropertyFilters({ values, onChange }: Props) {
       <select
         value={values.operacion}
         onChange={(e) => update('operacion', e.target.value)}
-        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+        className={selectCls}
       >
         <option value="">Operación</option>
         <option value="venta">Venta</option>

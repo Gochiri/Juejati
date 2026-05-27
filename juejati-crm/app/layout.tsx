@@ -1,9 +1,17 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
+import { Bricolage_Grotesque } from 'next/font/google'
 import './globals.css'
 import { SessionProvider } from '@/components/SessionProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
-const inter = Inter({ subsets: ['latin'] })
+const display = Bricolage_Grotesque({
+  subsets: ['latin'],
+  variable: '--font-display',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
+})
 
 export const metadata: Metadata = {
   title: 'Juejati CRM',
@@ -12,9 +20,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
-      <body className={inter.className}>
-        <SessionProvider>{children}</SessionProvider>
+    <html
+      lang="es"
+      suppressHydrationWarning
+      className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable}`}
+      style={{
+        // expose Geist font CSS variables under the names tailwind expects
+        ['--font-sans' as any]: 'var(--font-geist-sans)',
+        ['--font-mono' as any]: 'var(--font-geist-mono)',
+      }}
+    >
+      <body className="font-sans antialiased">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <SessionProvider>{children}</SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

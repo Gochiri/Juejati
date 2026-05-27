@@ -52,7 +52,6 @@ export default function PropiedadesPage() {
     }
   }
 
-  // Debounced reload on filter change
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => load({ resetOffset: true }), 400)
@@ -62,9 +61,8 @@ export default function PropiedadesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters])
 
-  // Reload on offset change (pagination)
   useEffect(() => {
-    if (offset === 0) return // already loaded by filters effect
+    if (offset === 0) return
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset])
@@ -76,13 +74,13 @@ export default function PropiedadesPage() {
     <div className="h-full flex flex-col overflow-hidden">
       <PropertyFilters values={filters} onChange={setFilters} />
 
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-        {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+      <div className="flex-1 overflow-y-auto p-4 bg-bg">
+        {error && <p className="text-sm text-danger mb-3">{error}</p>}
 
         {loading && properties.length === 0 ? (
-          <p className="text-center text-sm text-gray-400 py-12">Cargando propiedades...</p>
+          <p className="text-center text-sm text-fg-subtle py-12">Cargando propiedades...</p>
         ) : properties.length === 0 ? (
-          <p className="text-center text-sm text-gray-400 py-12">Sin propiedades con esos filtros</p>
+          <p className="text-center text-sm text-fg-subtle py-12">Sin propiedades con esos filtros</p>
         ) : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
             {properties.map((prop) => (
@@ -96,7 +94,7 @@ export default function PropiedadesPage() {
             {currentPage > 1 && (
               <button
                 onClick={() => setOffset((currentPage - 2) * PAGE_SIZE)}
-                className="px-3 py-1.5 rounded-lg bg-white border text-sm hover:border-blue-400"
+                className="px-3 py-1.5 rounded-md bg-surface border border-border text-sm hover:border-border-strong text-fg"
               >
                 ← Prev
               </button>
@@ -109,10 +107,10 @@ export default function PropiedadesPage() {
                 <button
                   key={page}
                   onClick={() => setOffset((page - 1) * PAGE_SIZE)}
-                  className={`px-3 py-1.5 rounded-lg text-sm ${
+                  className={`px-3 py-1.5 rounded-md text-sm font-mono tabular-nums ${
                     page === currentPage
-                      ? 'bg-blue-600 text-white border border-blue-600'
-                      : 'bg-white border hover:border-blue-400'
+                      ? 'bg-brand text-brand-fg border border-brand'
+                      : 'bg-surface border border-border hover:border-border-strong text-fg'
                   }`}
                 >
                   {page}
@@ -122,12 +120,12 @@ export default function PropiedadesPage() {
             {currentPage < totalPages && (
               <button
                 onClick={() => setOffset(currentPage * PAGE_SIZE)}
-                className="px-3 py-1.5 rounded-lg bg-white border text-sm hover:border-blue-400"
+                className="px-3 py-1.5 rounded-md bg-surface border border-border text-sm hover:border-border-strong text-fg"
               >
                 Sig →
               </button>
             )}
-            <span className="text-xs text-gray-400 self-center ml-1">{total} propiedades</span>
+            <span className="text-2xs font-mono tabular-nums text-fg-subtle self-center ml-1">{total} propiedades</span>
           </div>
         )}
       </div>

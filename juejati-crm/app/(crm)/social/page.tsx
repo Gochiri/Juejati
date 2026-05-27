@@ -39,18 +39,18 @@ export default function SocialPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-border shrink-0">
         <div>
-          <h1 className="font-bold text-lg">Social Planner</h1>
-          <p className="text-xs text-gray-400">Programá posts de propiedades en Instagram y Facebook</p>
+          <h1 className="font-medium text-fg text-lg">Social Planner</h1>
+          <p className="text-2xs text-fg-subtle">Programá posts de propiedades en Instagram y Facebook</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-1" /> Nuevo post
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-        {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+      <div className="flex-1 overflow-y-auto p-4 bg-bg">
+        {error && <p className="text-sm text-danger mb-3">{error}</p>}
         <SocialPostList posts={posts} accounts={accounts} loading={loading} />
       </div>
 

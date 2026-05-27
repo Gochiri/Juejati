@@ -115,7 +115,7 @@ export function ContactDetail({ contactId }: Props) {
 
   if (!contactId) {
     return (
-      <aside className="w-80 bg-white border-l border-gray-200 hidden lg:flex flex-col items-center justify-center text-gray-400 text-sm shrink-0">
+      <aside className="w-80 bg-surface border-l border-border hidden lg:flex flex-col items-center justify-center text-fg-subtle text-sm shrink-0">
         <p>Ficha del contacto</p>
       </aside>
     )
@@ -123,7 +123,7 @@ export function ContactDetail({ contactId }: Props) {
 
   if (loading && !data) {
     return (
-      <aside className="w-80 bg-white border-l border-gray-200 hidden lg:flex flex-col items-center justify-center text-gray-400 text-sm shrink-0">
+      <aside className="w-80 bg-surface border-l border-border hidden lg:flex flex-col items-center justify-center text-fg-subtle text-sm shrink-0">
         <p>Cargando...</p>
       </aside>
     )
@@ -131,7 +131,7 @@ export function ContactDetail({ contactId }: Props) {
 
   if (!data) {
     return (
-      <aside className="w-80 bg-white border-l border-gray-200 hidden lg:flex flex-col items-center justify-center text-red-500 text-sm shrink-0">
+      <aside className="w-80 bg-surface border-l border-border hidden lg:flex flex-col items-center justify-center text-danger text-sm shrink-0">
         <p>{error || 'Sin datos'}</p>
       </aside>
     )
@@ -148,28 +148,28 @@ export function ContactDetail({ contactId }: Props) {
   const utmCampaign = utm.utmCampaign || utm.campaign
 
   return (
-    <aside className="w-80 bg-white border-l border-gray-200 hidden lg:flex flex-col h-full shrink-0 overflow-y-auto">
+    <aside className="w-80 bg-surface border-l border-border hidden lg:flex flex-col h-full shrink-0 overflow-y-auto">
       {/* Header */}
-      <div className="p-4 border-b border-gray-100">
-        <h2 className="font-bold text-gray-900 truncate">{data.name}</h2>
-        <p className="text-sm text-gray-500 mt-0.5">{data.phone || '—'}</p>
-        {data.email && <p className="text-xs text-gray-400 truncate">{data.email}</p>}
+      <div className="p-4 border-b border-border">
+        <h2 className="font-medium text-fg truncate">{data.name}</h2>
+        <p className="text-2xs font-mono tabular-nums text-fg-muted mt-0.5">{data.phone || '—'}</p>
+        {data.email && <p className="text-2xs text-fg-subtle truncate">{data.email}</p>}
       </div>
 
-      {error && <p className="mx-4 mt-3 text-xs text-red-500">{error}</p>}
+      {error && <p className="mx-4 mt-3 text-xs text-danger">{error}</p>}
 
       {/* Sofía toggle */}
-      <section className="px-4 py-3 border-b border-gray-100">
+      <section className="px-4 py-3 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {sofiaActive ? (
-              <Bot className="w-4 h-4 text-green-600" />
+              <Bot className="w-4 h-4 text-brand" />
             ) : (
-              <BotOff className="w-4 h-4 text-gray-400" />
+              <BotOff className="w-4 h-4 text-fg-subtle" />
             )}
             <div>
-              <p className="text-sm font-semibold">Sofía IA</p>
-              <p className="text-xs text-gray-400">
+              <p className="text-sm font-medium text-fg">Sofía IA</p>
+              <p className="text-2xs text-fg-subtle">
                 {sofiaActive ? 'Responde automáticamente' : 'Pausada — respondés vos'}
               </p>
             </div>
@@ -178,12 +178,12 @@ export function ContactDetail({ contactId }: Props) {
             onClick={handleSofiaToggle}
             disabled={sofiaBusy}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-              sofiaActive ? 'bg-green-500' : 'bg-gray-300'
+              sofiaActive ? 'bg-brand' : 'bg-border-strong'
             }`}
             aria-label="Toggle Sofía"
           >
             <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+              className={`inline-block h-3 w-3 transform rounded-full bg-bg transition-transform ${
                 sofiaActive ? 'translate-x-5' : 'translate-x-1'
               }`}
             />
@@ -193,15 +193,15 @@ export function ContactDetail({ contactId }: Props) {
 
       {/* Score & stage badges */}
       {(scoreConf || data.source) && (
-        <section className="px-4 py-3 border-b border-gray-100 flex flex-wrap gap-1.5">
+        <section className="px-4 py-3 border-b border-border flex flex-wrap gap-1.5">
           {scoreConf && <Badge variant={scoreConf.variant}>Lead {scoreConf.label}</Badge>}
           {data.source && <Badge variant="default">{data.source}</Badge>}
         </section>
       )}
 
       {/* Criterios */}
-      <section className="px-4 py-3 border-b border-gray-100">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Criterios</h3>
+      <section className="px-4 py-3 border-b border-border">
+        <h3 className="text-2xs font-medium text-fg-subtle uppercase tracking-wider mb-2">Criterios</h3>
         <div className="space-y-1.5 text-sm">
           <DetailRow label="Zona" value={data.zona} />
           <DetailRow label="Operación" value={data.operacion} />
@@ -211,25 +211,26 @@ export function ContactDetail({ contactId }: Props) {
           <DetailRow
             label="Presupuesto"
             value={data.presupuesto_ia ? `USD ${Number(data.presupuesto_ia).toLocaleString('es-AR')}` : null}
+            mono
           />
         </div>
       </section>
 
       {/* Tags */}
-      <section className="px-4 py-3 border-b border-gray-100">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tags</h3>
+      <section className="px-4 py-3 border-b border-border">
+        <h3 className="text-2xs font-medium text-fg-subtle uppercase tracking-wider mb-2">Tags</h3>
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {visibleTags.length === 0 && <p className="text-xs text-gray-400">Sin tags</p>}
+          {visibleTags.length === 0 && <p className="text-2xs text-fg-subtle">Sin tags</p>}
           {visibleTags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs"
+              className="inline-flex items-center gap-1 bg-surface-2 text-fg px-2 py-0.5 rounded text-2xs"
             >
               {tag}
               <button
                 onClick={() => handleRemoveTag(tag)}
                 disabled={tagBusy}
-                className="hover:text-red-500 disabled:opacity-50"
+                className="hover:text-danger disabled:opacity-50"
                 aria-label={`Quitar ${tag}`}
               >
                 <X className="w-3 h-3" />
@@ -252,8 +253,8 @@ export function ContactDetail({ contactId }: Props) {
 
       {/* UTMs */}
       {(utmSource || utmMedium || utmCampaign) && (
-        <section className="px-4 py-3 border-b border-gray-100">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Atribución</h3>
+        <section className="px-4 py-3 border-b border-border">
+          <h3 className="text-2xs font-medium text-fg-subtle uppercase tracking-wider mb-2">Atribución</h3>
           <div className="space-y-1 text-xs">
             {utmSource && <DetailRow label="Source" value={utmSource} small />}
             {utmMedium && <DetailRow label="Medium" value={utmMedium} small />}
@@ -263,42 +264,42 @@ export function ContactDetail({ contactId }: Props) {
       )}
 
       {/* Propiedad asignada */}
-      <section className="px-4 py-3 border-b border-gray-100">
+      <section className="px-4 py-3 border-b border-border">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <h3 className="text-2xs font-medium text-fg-subtle uppercase tracking-wider">
             Propiedad asignada
           </h3>
           <button
             onClick={() => setAssignOpen(true)}
-            className="text-xs text-blue-600 hover:text-blue-700"
+            className="text-2xs text-brand hover:text-brand-hover"
           >
             {data.propiedad_tokko_id ? 'Cambiar' : 'Asignar'}
           </button>
         </div>
         {data.propiedad_tokko_id ? (
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="font-semibold text-sm text-gray-900 leading-tight">
+          <div className="bg-surface-2 rounded-lg p-3">
+            <p className="font-medium text-sm text-fg leading-tight">
               {data.titulo_propiedad || 'Sin título'}
             </p>
             {data.ubicacion_propiedad && (
-              <p className="text-xs text-gray-500 mt-0.5">{data.ubicacion_propiedad}</p>
+              <p className="text-2xs text-fg-muted mt-0.5">{data.ubicacion_propiedad}</p>
             )}
             {data.precio_propiedad && (
-              <p className="text-xs font-medium text-blue-700 mt-1">{data.precio_propiedad}</p>
+              <p className="text-2xs font-mono tabular-nums font-medium text-brand mt-1">{data.precio_propiedad}</p>
             )}
             {data.link_propiedad && (
               <a
                 href={data.link_propiedad}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-blue-500 hover:underline mt-1 inline-flex items-center gap-1"
+                className="text-2xs text-brand hover:underline mt-1 inline-flex items-center gap-1"
               >
                 Ver ficha <ExternalLink className="w-3 h-3" />
               </a>
             )}
           </div>
         ) : (
-          <p className="text-xs text-gray-400">Sin propiedad asignada</p>
+          <p className="text-2xs text-fg-subtle">Sin propiedad asignada</p>
         )}
       </section>
 
@@ -308,7 +309,7 @@ export function ContactDetail({ contactId }: Props) {
           href={`https://app.gohighlevel.com/v2/location/${process.env.NEXT_PUBLIC_GHL_LOCATION_ID || ''}/contacts/detail/${contactId}`}
           target="_blank"
           rel="noreferrer"
-          className="block w-full text-center text-xs py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition-colors"
+          className="block w-full text-center text-2xs py-2 rounded-md border border-border hover:bg-surface-2 text-fg-muted hover:text-fg transition-colors"
         >
           Abrir en GHL ↗
         </a>
@@ -326,12 +327,12 @@ export function ContactDetail({ contactId }: Props) {
   )
 }
 
-function DetailRow({ label, value, small }: { label: string; value: string | null | undefined; small?: boolean }) {
+function DetailRow({ label, value, small, mono }: { label: string; value: string | null | undefined; small?: boolean; mono?: boolean }) {
   if (!value) return null
   return (
-    <div className={`flex justify-between gap-2 ${small ? 'text-xs' : 'text-sm'}`}>
-      <span className="text-gray-400 shrink-0">{label}</span>
-      <span className="text-gray-900 text-right truncate">{value}</span>
+    <div className={`flex justify-between gap-2 ${small ? 'text-2xs' : 'text-sm'}`}>
+      <span className="text-fg-subtle shrink-0">{label}</span>
+      <span className={`text-fg text-right truncate ${mono ? 'font-mono tabular-nums' : ''}`}>{value}</span>
     </div>
   )
 }

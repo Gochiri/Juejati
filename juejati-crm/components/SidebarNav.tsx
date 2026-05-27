@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { MessageSquare, Building2, Calendar, Sparkles, KanbanSquare, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from './ThemeToggle'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Inbox', icon: MessageSquare, exact: true },
@@ -21,13 +22,13 @@ export function SidebarNav({ userName }: Props) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
-      <div className="px-4 py-4 border-b border-gray-100 flex items-center gap-2">
-        <span className="font-bold text-gray-900 text-lg">Juejati</span>
-        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">CRM</span>
+    <aside className="w-52 bg-surface border-r border-border flex flex-col h-full shrink-0">
+      <div className="px-4 h-12 flex items-center justify-between border-b border-border">
+        <span className="font-display font-semibold text-fg text-lg tracking-tight">juejati</span>
+        <span className="text-2xs font-mono tracking-wide text-fg-subtle uppercase">crm</span>
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-1">
+      <nav className="flex-1 px-2 py-3 space-y-0.5">
         {NAV_ITEMS.map((item) => {
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
           const Icon = item.icon
@@ -36,27 +37,35 @@ export function SidebarNav({ userName }: Props) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                'flex items-center gap-2.5 px-2.5 py-1.5 rounded text-sm transition-colors relative',
                 active
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'text-fg bg-surface-2 font-medium'
+                  : 'text-fg-muted hover:text-fg hover:bg-surface-2/60'
               )}
             >
-              <Icon className="w-4 h-4 shrink-0" />
+              {active && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-brand" />
+              )}
+              <Icon className={cn('w-4 h-4 shrink-0', active && 'text-brand')} />
               <span>{item.label}</span>
             </Link>
           )
         })}
       </nav>
 
-      <div className="border-t border-gray-100 p-3 space-y-2">
+      <div className="border-t border-border p-2 space-y-1">
         {userName && (
-          <p className="text-xs text-gray-500 px-2 truncate">{userName}</p>
+          <div className="px-2.5 py-1.5 flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-brand/15 text-brand text-xs font-medium flex items-center justify-center font-mono shrink-0">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-xs text-fg-muted truncate flex-1">{userName}</span>
+            <ThemeToggle />
+          </div>
         )}
         <button
-          type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-sm text-fg-muted hover:text-fg hover:bg-surface-2/60 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span>Cerrar sesión</span>

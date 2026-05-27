@@ -33,12 +33,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-bg p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-2xl font-bold text-gray-900">Juejati</span>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">CRM</span>
+            <span className="font-display font-semibold text-fg text-2xl tracking-tight">juejati</span>
+            <span className="text-2xs font-mono tracking-wide text-fg-subtle uppercase">crm</span>
           </div>
           <CardTitle>Iniciar sesión</CardTitle>
           <CardDescription>Ingresá con tus credenciales de agente</CardDescription>

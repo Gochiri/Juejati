@@ -25,12 +25,11 @@ export function PropertyCard({ property, assigned, onAssign, onClear, busy }: Pr
   const isVenta = property.operacion?.toLowerCase().includes('venta')
 
   return (
-    <div className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border-2 ${
-      assigned ? 'border-green-400' : 'border-transparent'
+    <div className={`bg-surface rounded-lg overflow-hidden hover:bg-surface-2 transition-colors border ${
+      assigned ? 'border-brand' : 'border-border hover:border-border-strong'
     }`}>
-      <div className="relative h-44 bg-gray-100">
+      <div className="relative h-44 bg-surface-2">
         {property.imagen ? (
-          // Using <img> instead of next/image to avoid domain config issues with Tokko URLs
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={property.imagen}
@@ -46,7 +45,7 @@ export function PropertyCard({ property, assigned, onAssign, onClear, busy }: Pr
           </div>
         )}
         {precio && (
-          <span className="absolute top-2 right-2 bg-black/65 text-white text-xs font-bold px-2 py-1 rounded-lg">
+          <span className="absolute top-2 right-2 bg-fg/85 text-bg text-2xs font-mono font-medium tabular-nums px-2 py-1 rounded">
             {precio}
           </span>
         )}
@@ -60,18 +59,18 @@ export function PropertyCard({ property, assigned, onAssign, onClear, busy }: Pr
         )}
         {assigned && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-            <Badge variant="green">Asignada ✓</Badge>
+            <Badge variant="brand">Asignada ✓</Badge>
           </div>
         )}
       </div>
       <div className="p-3">
-        <p className="font-semibold text-gray-900 text-sm leading-tight truncate" title={property.titulo || ''}>
+        <p className="font-medium text-fg text-sm leading-tight truncate" title={property.titulo || ''}>
           {property.titulo || 'Sin título'}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5 truncate">
+        <p className="text-2xs text-fg-muted mt-0.5 truncate">
           {[property.barrio, property.direccion].filter(Boolean).join(' · ')}
         </p>
-        {details && <p className="text-xs text-gray-400 mt-0.5">{details}</p>}
+        {details && <p className="text-2xs text-fg-subtle mt-0.5">{details}</p>}
         <div className="mt-3 flex gap-2 items-center">
           {onAssign && (
             <Button
@@ -89,7 +88,7 @@ export function PropertyCard({ property, assigned, onAssign, onClear, busy }: Pr
               href={property.ficha_tokko}
               target="_blank"
               rel="noreferrer"
-              className="text-gray-400 hover:text-blue-500 p-1.5 shrink-0"
+              className="text-fg-subtle hover:text-brand p-1.5 shrink-0"
               title="Ver ficha"
             >
               <ExternalLink className="w-4 h-4" />

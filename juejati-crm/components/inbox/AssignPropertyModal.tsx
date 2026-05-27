@@ -77,18 +77,18 @@ export function AssignPropertyModal({ contactId, currentTokkoId, onClose, onAssi
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+      <div className="bg-surface border border-border rounded-lg w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
           <div>
-            <h2 className="font-bold text-lg text-gray-900">Asignar propiedad</h2>
-            <p className="text-xs text-gray-400">Elegí una propiedad para vincular al lead</p>
+            <h2 className="font-medium text-lg text-fg">Asignar propiedad</h2>
+            <p className="text-2xs text-fg-subtle">Elegí una propiedad para vincular al lead</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="px-5 py-3 border-b border-gray-100 shrink-0">
+        <div className="px-5 py-3 border-b border-border shrink-0">
           <div className="flex gap-2">
             <Input
               placeholder="Buscar por título, dirección o barrio..."
@@ -109,11 +109,11 @@ export function AssignPropertyModal({ contactId, currentTokkoId, onClose, onAssi
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+          {error && <p className="text-sm text-danger mb-3">{error}</p>}
           {loading ? (
-            <p className="text-center text-sm text-gray-400 py-8">Buscando...</p>
+            <p className="text-center text-sm text-fg-subtle py-8">Buscando...</p>
           ) : properties.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">Sin resultados</p>
+            <p className="text-center text-sm text-fg-subtle py-8">Sin resultados</p>
           ) : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
               {properties.map((prop) => (

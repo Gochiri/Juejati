@@ -126,24 +126,24 @@ export function CreatePostModal({ onClose, onCreated }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+      <div className="bg-surface border border-border rounded-lg w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
           <div>
-            <h2 className="font-bold text-lg">Nuevo post</h2>
-            <p className="text-xs text-gray-400">
+            <h2 className="font-medium text-lg text-fg">Nuevo post</h2>
+            <p className="text-2xs text-fg-subtle">
               {step === 'property' ? 'Paso 1: Elegí una propiedad' : 'Paso 2: Componé el post'}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {step === 'property' ? (
           <>
-            <div className="px-5 py-3 border-b border-gray-100 shrink-0">
+            <div className="px-5 py-3 border-b border-border shrink-0">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                 <Input
                   className="pl-9"
                   placeholder="Buscar propiedad por título, dirección o barrio..."
@@ -155,30 +155,30 @@ export function CreatePostModal({ onClose, onCreated }: Props) {
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               {searchingProps ? (
-                <p className="text-sm text-gray-400 text-center py-4">Buscando...</p>
+                <p className="text-sm text-fg-subtle text-center py-4">Buscando...</p>
               ) : properties.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">Sin resultados</p>
+                <p className="text-sm text-fg-subtle text-center py-4">Sin resultados</p>
               ) : (
                 <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
                   {properties.map((prop) => (
                     <button
                       key={prop.tokko_id}
                       onClick={() => selectProperty(prop)}
-                      className="bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors text-left"
+                      className="bg-surface rounded-lg overflow-hidden border border-border hover:border-border-strong transition-colors text-left"
                     >
                       {prop.imagen ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={prop.imagen} alt="" className="w-full h-32 object-cover" />
                       ) : (
-                        <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
+                        <div className="w-full h-32 bg-surface-2 flex items-center justify-center">
                           <span className="text-3xl">🏢</span>
                         </div>
                       )}
                       <div className="p-2">
-                        <p className="text-sm font-semibold truncate">{prop.titulo}</p>
-                        <p className="text-xs text-gray-500 truncate">{prop.barrio || '—'}</p>
+                        <p className="text-sm font-medium text-fg truncate">{prop.titulo}</p>
+                        <p className="text-2xs text-fg-muted truncate">{prop.barrio || '—'}</p>
                         {prop.precio && (
-                          <p className="text-xs text-blue-600 mt-1">
+                          <p className="text-2xs font-mono tabular-nums text-brand mt-1">
                             {prop.moneda || 'USD'} {Number(prop.precio).toLocaleString('es-AR')}
                           </p>
                         )}
@@ -191,18 +191,18 @@ export function CreatePostModal({ onClose, onCreated }: Props) {
           </>
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
-            <div className="flex gap-3 bg-gray-50 rounded-lg p-3">
+            <div className="flex gap-3 bg-surface-2 rounded-md p-3">
               {selectedProp?.imagen && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={selectedProp.imagen} alt="" className="w-20 h-20 rounded object-cover shrink-0" />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{selectedProp?.titulo}</p>
-                <p className="text-xs text-gray-500">{selectedProp?.barrio}</p>
+                <p className="text-sm font-medium text-fg truncate">{selectedProp?.titulo}</p>
+                <p className="text-2xs text-fg-muted">{selectedProp?.barrio}</p>
                 <button
                   type="button"
                   onClick={() => { setStep('property'); setSelectedProp(null) }}
-                  className="text-xs text-blue-600 hover:underline mt-1"
+                  className="text-2xs text-brand hover:underline mt-1"
                 >
                   Cambiar propiedad
                 </button>
@@ -230,13 +230,13 @@ export function CreatePostModal({ onClose, onCreated }: Props) {
                 rows={8}
                 required
               />
-              <p className="text-xs text-gray-400">{copy.length} caracteres</p>
+              <p className="text-2xs font-mono tabular-nums text-fg-subtle">{copy.length} caracteres</p>
             </div>
 
             <div className="space-y-2">
               <Label>Cuentas sociales</Label>
               {accounts.length === 0 ? (
-                <p className="text-xs text-gray-400">No hay cuentas conectadas en GHL.</p>
+                <p className="text-2xs text-fg-subtle">No hay cuentas conectadas en GHL.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {accounts.map((acc) => {
@@ -246,10 +246,10 @@ export function CreatePostModal({ onClose, onCreated }: Props) {
                         key={acc.id}
                         type="button"
                         onClick={() => toggleAccount(acc.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                        className={`px-3 py-1.5 rounded text-2xs border transition-colors ${
                           selected
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
+                            ? 'bg-brand text-brand-fg border-brand'
+                            : 'bg-surface text-fg border-border hover:border-border-strong'
                         }`}
                       >
                         {acc.platform} · {acc.name}
@@ -270,9 +270,9 @@ export function CreatePostModal({ onClose, onCreated }: Props) {
               />
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-sm text-danger">{error}</p>}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
               <Button
                 type="submit"

@@ -7,7 +7,7 @@ export default async function CRMLayout({ children }: { children: React.ReactNod
   if (!session) redirect('/login')
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
+    <div className="h-screen flex overflow-hidden bg-bg">
       <SidebarNav userName={session.user?.name || ''} />
       <main className="flex-1 overflow-hidden">
         {children}
