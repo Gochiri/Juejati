@@ -14,8 +14,12 @@ const display = Bricolage_Grotesque({
 })
 
 export const metadata: Metadata = {
-  title: 'Juejati CRM',
-  description: 'CRM para agentes inmobiliarios de Juejati Brokers',
+  title: 'Propify',
+  description: 'CRM inmobiliario',
+  icons: {
+    icon: '/propify.png',
+    apple: '/propify.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

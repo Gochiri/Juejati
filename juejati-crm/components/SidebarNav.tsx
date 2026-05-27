@@ -23,9 +23,10 @@ export function SidebarNav({ userName }: Props) {
 
   return (
     <aside className="w-52 bg-surface border-r border-border flex flex-col h-full shrink-0">
-      <div className="px-4 h-12 flex items-center justify-between border-b border-border">
-        <span className="font-display font-semibold text-fg text-lg tracking-tight">juejati</span>
-        <span className="text-2xs font-mono tracking-wide text-fg-subtle uppercase">crm</span>
+      <div className="px-4 h-14 flex items-center gap-2 border-b border-border">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/propify.png" alt="Propify" className="h-8 w-auto select-none" />
+        <span className="font-display font-semibold text-fg text-lg tracking-tight">propify</span>
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5">

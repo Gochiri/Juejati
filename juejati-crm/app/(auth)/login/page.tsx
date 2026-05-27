@@ -36,9 +36,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-bg p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="font-display font-semibold text-fg text-2xl tracking-tight">juejati</span>
-            <span className="text-2xs font-mono tracking-wide text-fg-subtle uppercase">crm</span>
+          <div className="flex justify-center mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/propify.png" alt="Propify" className="h-24 w-auto select-none" />
           </div>
           <CardTitle>Iniciar sesión</CardTitle>
           <CardDescription>Ingresá con tus credenciales de agente</CardDescription>
@@ -50,7 +50,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="agente@juejati.com"
+                placeholder="agente@inmobiliaria.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
