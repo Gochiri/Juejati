@@ -37,6 +37,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     })
   } catch (err: any) {
     console.error('[GET /api/leads/:id]', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Error al cargar contacto' }, { status: 500 })
   }
 }

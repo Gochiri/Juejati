@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ messages })
   } catch (err: any) {
     console.error('[GET /api/leads/:id/messages]', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Error al cargar mensajes' }, { status: 500 })
   }
 }
 
@@ -33,6 +33,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error('[POST /api/leads/:id/messages]', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'No se pudo enviar el mensaje' }, { status: 500 })
   }
 }

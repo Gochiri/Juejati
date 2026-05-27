@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { LeadCard } from './LeadCard'
 import type { GHLLead } from '@/lib/ghl'
@@ -15,7 +15,7 @@ export function LeadList({ selectedId, onSelect }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null)
+  const searchTimer = useRef<NodeJS.Timeout | null>(null)
 
   const load = useCallback(async (q?: string) => {
     setLoading(true)
@@ -41,14 +41,13 @@ export function LeadList({ selectedId, onSelect }: Props) {
 
   function onSearch(value: string) {
     setQuery(value)
-    if (searchTimer) clearTimeout(searchTimer)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
     if (value.trim().length === 0) {
       load()
       return
     }
     if (value.trim().length < 2) return
-    const t = setTimeout(() => load(value.trim()), 400)
-    setSearchTimer(t)
+    searchTimer.current = setTimeout(() => load(value.trim()), 400)
   }
 
   return (
