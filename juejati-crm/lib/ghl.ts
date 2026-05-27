@@ -437,13 +437,28 @@ function guessMediaType(url: string): string {
 }
 
 export async function fetchSocialPosts(): Promise<GHLSocialPost[]> {
+  // GHL exige accountIds para listar posts. Si no tenemos cuentas, devolvemos lista vacía.
+  let accountIds: string[] = []
+  try {
+    const accounts = await fetchSocialAccounts()
+    accountIds = accounts.map((a) => a.id).filter(Boolean)
+  } catch {
+    return []
+  }
+  if (accountIds.length === 0) return []
+
   const url = `${GHL_API_BASE}/social-media-posting/${getGhlLocationId()}/posts/list`
   const res = await fetch(url, {
     method: 'POST',
     headers: ghlHeaders(),
-    body: JSON.stringify({ type: 'all', limit: 50, skip: 0 }),
+    body: JSON.stringify({ type: 'all', accountIds, limit: 50, skip: 0 }),
   })
-  if (!res.ok) throw new Error(`GHL social posts error: ${res.status}`)
+  if (!res.ok) {
+    // GHL puede tirar 422 si el body no cumple. No romper la página: devolver vacío y loguear.
+    const errText = await res.text().catch(() => '')
+    console.error(`[fetchSocialPosts] GHL ${res.status}:`, errText)
+    return []
+  }
   const data = await res.json()
   const posts = data.posts || data.results?.posts || []
   return posts.map((p: any): GHLSocialPost => ({
