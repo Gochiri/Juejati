@@ -243,3 +243,95 @@ export interface GHLContactDetail {
   ubicacion_propiedad: string | null
   link_propiedad: string | null
 }
+
+export interface GHLCalendar {
+  id: string
+  name: string
+  isActive: boolean
+}
+
+export interface GHLAppointment {
+  id: string
+  calendarId: string
+  contactId: string | null
+  title: string
+  startTime: string
+  endTime: string
+  status: string
+  notes: string | null
+  address: string | null
+  contactName?: string
+  contactPhone?: string
+}
+
+export async function fetchCalendars(): Promise<GHLCalendar[]> {
+  const url = `${GHL_API_BASE}/calendars/?locationId=${getGhlLocationId()}`
+  const res = await fetch(url, { headers: ghlHeaders() })
+  if (!res.ok) throw new Error(`GHL calendars error: ${res.status}`)
+  const data = await res.json()
+  return (data.calendars || []).map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    isActive: c.isActive !== false,
+  }))
+}
+
+export async function fetchAppointments(params: {
+  calendarId?: string
+  startTime: string
+  endTime: string
+}): Promise<GHLAppointment[]> {
+  const url = new URL(`${GHL_API_BASE}/calendars/events`)
+  url.searchParams.set('locationId', getGhlLocationId())
+  url.searchParams.set('startTime', params.startTime)
+  url.searchParams.set('endTime', params.endTime)
+  if (params.calendarId) url.searchParams.set('calendarId', params.calendarId)
+
+  const res = await fetch(url.toString(), { headers: ghlHeaders() })
+  if (!res.ok) throw new Error(`GHL appointments error: ${res.status}`)
+  const data = await res.json()
+  const events = data.events || []
+  return events.map((e: any): GHLAppointment => ({
+    id: e.id,
+    calendarId: e.calendarId,
+    contactId: e.contactId || null,
+    title: e.title || 'Sin título',
+    startTime: e.startTime,
+    endTime: e.endTime,
+    status: e.appointmentStatus || e.status || 'confirmed',
+    notes: e.notes || null,
+    address: e.address || null,
+  }))
+}
+
+export async function createAppointment(params: {
+  calendarId: string
+  contactId: string
+  startTime: string
+  endTime: string
+  title: string
+  notes?: string
+  address?: string
+}): Promise<{ id: string }> {
+  const res = await fetch(`${GHL_API_BASE}/calendars/events/appointments`, {
+    method: 'POST',
+    headers: ghlHeaders(),
+    body: JSON.stringify({
+      locationId: getGhlLocationId(),
+      calendarId: params.calendarId,
+      contactId: params.contactId,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      title: params.title,
+      ...(params.notes && { notes: params.notes }),
+      ...(params.address && { address: params.address }),
+      appointmentStatus: 'confirmed',
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Create appointment error: ${res.status} ${err}`)
+  }
+  const data = await res.json()
+  return { id: data.id || data.appointment?.id }
+}
