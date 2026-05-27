@@ -16,6 +16,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result)
   } catch (err: any) {
     console.error('[GET /api/leads]', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Error al cargar leads' }, { status: 500 })
   }
 }

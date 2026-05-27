@@ -152,7 +152,15 @@ export async function sendMessage(contactId: string, text: string): Promise<void
   const conversations = convData.conversations || []
   if (!conversations.length) throw new Error('No conversation found for contact')
   const conversationId = conversations[0].id
-  const type = conversations[0].type === 'TYPE_WHATSAPP' ? 'WhatsApp' : 'SMS'
+  const TYPE_MAP: Record<string, string> = {
+    TYPE_WHATSAPP: 'WhatsApp',
+    TYPE_SMS: 'SMS',
+  }
+  const convType = conversations[0].type
+  const type = TYPE_MAP[convType]
+  if (!type) {
+    throw new Error(`Tipo de conversación no soportado: ${convType}. Solo WhatsApp y SMS.`)
+  }
 
   const res = await fetch(`${GHL_API_BASE}/conversations/messages`, {
     method: 'POST',

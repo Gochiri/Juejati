@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -35,39 +35,52 @@ export function ChatPanel({ contactId, contactName, contactPhone }: Props) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const mountedRef = useRef(true)
+  const currentContactRef = useRef<string | null>(null)
 
   useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const loadMessages = useCallback(async (cid: string) => {
+    try {
+      const res = await fetch(`/api/leads/${cid}/messages?limit=30`)
+      if (!res.ok) throw new Error((await res.json()).error || 'Error')
+      const data = await res.json()
+      if (!mountedRef.current) return
+      if (currentContactRef.current !== cid) return
+      const sorted = [...(data.messages || [])].sort(
+        (a: GHLMessage, b: GHLMessage) =>
+          new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      )
+      setMessages(sorted)
+      setError('')
+    } catch (err: any) {
+      if (mountedRef.current && currentContactRef.current === cid) setError(err.message)
+    }
+  }, [])
+
+  useEffect(() => {
+    currentContactRef.current = contactId
     if (!contactId) {
       setMessages([])
       return
     }
-    let cancelled = false
-
-    async function load() {
-      try {
-        const res = await fetch(`/api/leads/${contactId}/messages?limit=30`)
-        if (!res.ok) throw new Error((await res.json()).error || 'Error')
-        const data = await res.json()
-        if (cancelled) return
-        const sorted = [...(data.messages || [])].sort(
-          (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
-        )
-        setMessages(sorted)
-        setError('')
-      } catch (err: any) {
-        if (!cancelled) setError(err.message)
-      }
-    }
+    const cid = contactId
 
     setLoading(true)
-    load().finally(() => !cancelled && setLoading(false))
+    loadMessages(cid).finally(() => {
+      if (mountedRef.current && currentContactRef.current === cid) setLoading(false)
+    })
 
-    const interval = setInterval(load, 10000)
+    const interval = setInterval(() => loadMessages(cid), 10000)
     return () => {
-      cancelled = true
       clearInterval(interval)
     }
-  }, [contactId])
+  }, [contactId, loadMessages])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -88,19 +101,11 @@ export function ChatPanel({ contactId, contactName, contactPhone }: Props) {
       })
       if (!res.ok) throw new Error((await res.json()).error || 'Error al enviar')
       setText('')
-      const r = await fetch(`/api/leads/${contactId}/messages?limit=30`)
-      if (r.ok) {
-        const data = await r.json()
-        const sorted = [...(data.messages || [])].sort(
-          (a: GHLMessage, b: GHLMessage) =>
-            new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
-        )
-        setMessages(sorted)
-      }
+      await loadMessages(contactId)
     } catch (err: any) {
-      setError(err.message)
+      if (mountedRef.current) setError(err.message)
     } finally {
-      setSending(false)
+      if (mountedRef.current) setSending(false)
     }
   }
 
@@ -166,7 +171,7 @@ export function ChatPanel({ contactId, contactName, contactPhone }: Props) {
                 {msg.body}
               </div>
               <div className="flex items-center gap-2 mt-1 px-1">
-                {label && <Badge variant={variant as any}>{label}</Badge>}
+                {label && <Badge variant={variant}>{label}</Badge>}
                 <span className="text-xs text-gray-400">{formatTime(msg.createdAt)}</span>
               </div>
             </div>
