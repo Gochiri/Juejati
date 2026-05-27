@@ -55,9 +55,39 @@ function mapOpportunity(opp: any): GHLLead {
   }
 }
 
+export interface GHLStage {
+  id: string
+  name: string
+  position: number
+}
+
+export interface GHLPipeline {
+  id: string
+  name: string
+  stages: GHLStage[]
+}
+
+export async function fetchPipelines(): Promise<GHLPipeline[]> {
+  const url = `${GHL_API_BASE}/opportunities/pipelines?locationId=${getGhlLocationId()}`
+  const res = await fetch(url, { headers: ghlHeaders() })
+  if (!res.ok) throw new Error(`GHL pipelines error: ${res.status}`)
+  const data = await res.json()
+  const pipelines = data.pipelines || []
+  return pipelines.map((p: any): GHLPipeline => ({
+    id: p.id,
+    name: p.name,
+    stages: (p.stages || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      position: s.position ?? 0,
+    })).sort((a: GHLStage, b: GHLStage) => a.position - b.position),
+  }))
+}
+
 export async function fetchLeads(params: {
   q?: string
   stage?: string
+  pipelineId?: string
   page?: number
   limit?: number
 }): Promise<{ leads: GHLLead[]; total: number; hasMore: boolean }> {
@@ -96,7 +126,9 @@ export async function fetchLeads(params: {
     return { leads, total: data.meta?.total || leads.length, hasMore: false }
   }
 
-  const url = `${GHL_API_BASE}/opportunities/search?location_id=${getGhlLocationId()}&limit=${limit}&page=${page}`
+  let url = `${GHL_API_BASE}/opportunities/search?location_id=${getGhlLocationId()}&limit=${limit}&page=${page}`
+  if (params.stage) url += `&pipeline_stage_id=${encodeURIComponent(params.stage)}`
+  if (params.pipelineId) url += `&pipeline_id=${encodeURIComponent(params.pipelineId)}`
   const res = await fetch(url, { headers: ghlHeaders() })
   if (!res.ok) throw new Error(`GHL leads error: ${res.status}`)
   const data = await res.json()

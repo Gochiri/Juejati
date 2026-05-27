@@ -15,14 +15,17 @@ export function LeadList({ selectedId, onSelect }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
+  const [stages, setStages] = useState<{ id: string; name: string }[]>([])
+  const [selectedStage, setSelectedStage] = useState('')
   const searchTimer = useRef<NodeJS.Timeout | null>(null)
 
-  const load = useCallback(async (q?: string) => {
+  const load = useCallback(async (q?: string, stageId?: string) => {
     setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams({ limit: '100' })
       if (q) params.set('q', q)
+      if (stageId) params.set('stage', stageId)
       const res = await fetch('/api/leads?' + params)
       if (!res.ok) throw new Error((await res.json()).error || 'Error')
       const data = await res.json()
@@ -39,15 +42,30 @@ export function LeadList({ selectedId, onSelect }: Props) {
     load()
   }, [load])
 
+  useEffect(() => {
+    fetch('/api/pipelines')
+      .then((r) => r.json())
+      .then((d) => {
+        const firstPipeline = d.pipelines?.[0]
+        if (firstPipeline) setStages(firstPipeline.stages)
+      })
+      .catch(() => {})
+  }, [])
+
   function onSearch(value: string) {
     setQuery(value)
     if (searchTimer.current) clearTimeout(searchTimer.current)
     if (value.trim().length === 0) {
-      load()
+      load(undefined, selectedStage || undefined)
       return
     }
     if (value.trim().length < 2) return
-    searchTimer.current = setTimeout(() => load(value.trim()), 400)
+    searchTimer.current = setTimeout(() => load(value.trim(), selectedStage || undefined), 400)
+  }
+
+  function onStageChange(stageId: string) {
+    setSelectedStage(stageId)
+    load(query.trim() || undefined, stageId || undefined)
   }
 
   return (
@@ -58,6 +76,16 @@ export function LeadList({ selectedId, onSelect }: Props) {
           value={query}
           onChange={(e) => onSearch(e.target.value)}
         />
+        <select
+          value={selectedStage}
+          onChange={(e) => onStageChange(e.target.value)}
+          className="w-full mt-2 h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+        >
+          <option value="">Todas las etapas</option>
+          {stages.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
         <p className="text-xs text-gray-400 mt-1.5 px-1">
           {loading ? 'Cargando...' : `${leads.length} de ${total} leads`}
         </p>

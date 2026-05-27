@@ -8,11 +8,13 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q') || undefined
+  const stage = searchParams.get('stage') || undefined
+  const pipelineId = searchParams.get('pipelineId') || undefined
   const page = parseInt(searchParams.get('page') || '1')
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
 
   try {
-    const result = await fetchLeads({ q, page, limit })
+    const result = await fetchLeads({ q, page, limit, stage, pipelineId })
     return NextResponse.json(result)
   } catch (err: any) {
     console.error('[GET /api/leads]', err)
