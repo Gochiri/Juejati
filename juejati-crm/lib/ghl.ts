@@ -335,3 +335,89 @@ export async function createAppointment(params: {
   const data = await res.json()
   return { id: data.id || data.appointment?.id }
 }
+
+export interface GHLSocialAccount {
+  id: string
+  platform: string
+  name: string
+  profilePicture?: string | null
+}
+
+export interface GHLSocialPost {
+  id: string
+  status: string
+  type: string
+  summary: string
+  source: string
+  scheduledTime: string | null
+  publishedTime: string | null
+  accountIds: string[]
+  mediaUrls: string[]
+}
+
+export async function fetchSocialAccounts(): Promise<GHLSocialAccount[]> {
+  const url = `${GHL_API_BASE}/social-media-posting/${getGhlLocationId()}/accounts`
+  const res = await fetch(url, { headers: ghlHeaders() })
+  if (!res.ok) throw new Error(`GHL social accounts error: ${res.status}`)
+  const data = await res.json()
+  const accounts = data.accounts || data.results?.accounts || []
+  return accounts.map((a: any) => ({
+    id: a.id || a._id,
+    platform: a.platform || a.type,
+    name: a.name || a.profileName || 'Cuenta',
+    profilePicture: a.profilePicture || a.picture || null,
+  }))
+}
+
+export async function fetchSocialPosts(): Promise<GHLSocialPost[]> {
+  const url = `${GHL_API_BASE}/social-media-posting/${getGhlLocationId()}/posts/list`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: ghlHeaders(),
+    body: JSON.stringify({ type: 'all', limit: 50, skip: 0 }),
+  })
+  if (!res.ok) throw new Error(`GHL social posts error: ${res.status}`)
+  const data = await res.json()
+  const posts = data.posts || data.results?.posts || []
+  return posts.map((p: any): GHLSocialPost => ({
+    id: p.id || p._id,
+    status: p.status || 'scheduled',
+    type: p.type || 'post',
+    summary: p.summary || p.text || '',
+    source: p.source || 'manual',
+    scheduledTime: p.scheduleDate || p.scheduledTime || null,
+    publishedTime: p.publishedDate || p.publishedTime || null,
+    accountIds: p.accountIds || p.accounts || [],
+    mediaUrls: (p.media || []).map((m: any) => m.url || m).filter(Boolean),
+  }))
+}
+
+export async function createSocialPost(params: {
+  accountIds: string[]
+  summary: string
+  scheduleDate: string
+  mediaUrl?: string
+}): Promise<{ id: string }> {
+  const body: any = {
+    accountIds: params.accountIds,
+    summary: params.summary,
+    scheduleDate: params.scheduleDate,
+    type: 'post',
+    status: 'scheduled',
+  }
+  if (params.mediaUrl) {
+    body.media = [{ url: params.mediaUrl, type: 'image' }]
+  }
+
+  const res = await fetch(`${GHL_API_BASE}/social-media-posting/${getGhlLocationId()}/posts`, {
+    method: 'POST',
+    headers: ghlHeaders(),
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Create social post error: ${res.status} ${err}`)
+  }
+  const data = await res.json()
+  return { id: data.id || data.post?.id || data._id }
+}
