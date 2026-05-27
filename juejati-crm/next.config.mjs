@@ -1,5 +1,5 @@
-import type { NextConfig } from 'next'
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   output: 'standalone',
   env: {
     NEXT_PUBLIC_GHL_LOCATION_ID: process.env.GHL_LOCATION_ID,
@@ -17,4 +17,5 @@ const nextConfig: NextConfig = {
     ],
   },
 }
+
 export default nextConfig
