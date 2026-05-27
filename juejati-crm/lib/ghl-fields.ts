@@ -17,12 +17,18 @@ export const GHL_FIELD_IDS = {
 } as const
 
 export const GHL_API_BASE = 'https://services.leadconnectorhq.com'
-export const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID!
-export const GHL_API_KEY = process.env.GHL_API_KEY!
+
+export function getGhlLocationId(): string {
+  const v = process.env.GHL_LOCATION_ID
+  if (!v) throw new Error('GHL_LOCATION_ID env var is not set')
+  return v
+}
 
 export function ghlHeaders() {
+  const key = process.env.GHL_API_KEY
+  if (!key) throw new Error('GHL_API_KEY env var is not set')
   return {
-    Authorization: `Bearer ${GHL_API_KEY}`,
+    Authorization: `Bearer ${key}`,
     Version: '2021-07-28',
     'Content-Type': 'application/json',
   }
