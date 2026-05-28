@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { GHLLead } from '@/lib/ghl'
 
@@ -8,18 +9,103 @@ const SCORE_DOT: Record<string, string> = {
   caliente: 'bg-danger',
 }
 
+/**
+ * Fields fetched lazily from /api/leads/{contactId} when the drawer opens.
+ * These come from the contact endpoint (full custom fields), which the
+ * /opportunities/search endpoint does NOT include.
+ */
+export interface EnrichedFields {
+  email?: string
+  zona?: string | null
+  operacion?: string | null
+  presupuesto_ia?: string | null
+  ambientes?: string | null
+  score_lead?: string | null
+  propiedad_tokko_id?: string | null
+  titulo_propiedad?: string | null
+  precio_propiedad?: string | null
+  ubicacion_propiedad?: string | null
+  link_propiedad?: string | null
+}
+
 interface Props {
   opportunity: GHLLead | null
   stageName: string
   onClose: () => void
+  /**
+   * Called once when the lazy contact fetch resolves. The pipeline page uses
+   * this to backfill the kanban card and the localStorage cache with the
+   * full custom fields, so the card shows score dot/criteria on next render.
+   */
+  onEnriched?: (contactId: string, enriched: EnrichedFields) => void
 }
 
-export function OpportunityDrawer({ opportunity, stageName, onClose }: Props) {
+export function OpportunityDrawer({ opportunity, stageName, onClose, onEnriched }: Props) {
   const router = useRouter()
+  const [enriched, setEnriched] = useState<EnrichedFields | null>(null)
+  const [loading, setLoading] = useState(false)
+  // Hold the latest onEnriched in a ref so the fetch effect doesn't re-run
+  // when the parent re-renders with a fresh callback identity.
+  const onEnrichedRef = useRef(onEnriched)
+  useEffect(() => {
+    onEnrichedRef.current = onEnriched
+  }, [onEnriched])
+
+  const contactId = opportunity?.contactId
+  useEffect(() => {
+    if (!contactId) {
+      setEnriched(null)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setEnriched(null)
+    setLoading(true)
+    fetch('/api/leads/' + contactId)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return
+        const e: EnrichedFields = {
+          email: data.email ?? undefined,
+          zona: data.zona ?? null,
+          operacion: data.operacion ?? null,
+          presupuesto_ia: data.presupuesto_ia ?? null,
+          ambientes: data.ambientes ?? null,
+          score_lead: data.score_lead ?? null,
+          propiedad_tokko_id: data.propiedad_tokko_id ?? null,
+          titulo_propiedad: data.titulo_propiedad ?? null,
+          precio_propiedad: data.precio_propiedad ?? null,
+          ubicacion_propiedad: data.ubicacion_propiedad ?? null,
+          link_propiedad: data.link_propiedad ?? null,
+        }
+        setEnriched(e)
+        onEnrichedRef.current?.(contactId, e)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [contactId])
+
   if (!opportunity) return null
 
-  const score = opportunity.score_lead?.toLowerCase()
+  // Prefer enriched values once the contact fetch resolves; fall back to props before then.
+  function pick<K extends keyof EnrichedFields>(k: K): EnrichedFields[K] | undefined {
+    return enriched ? enriched[k] : (opportunity as any)?.[k]
+  }
+
+  // Display helper: "…" while the lazy fetch is in flight, "—" if truly empty.
+  function display(v: any): string {
+    if (v == null || v === '') return loading && !enriched ? '…' : '—'
+    return String(v)
+  }
+
+  const score = (pick('score_lead') as string | null | undefined)?.toLowerCase()
   const dotClass = score ? SCORE_DOT[score] : null
+  const propiedadId = pick('propiedad_tokko_id')
 
   function openConversation() {
     if (!opportunity) return
@@ -65,7 +151,7 @@ export function OpportunityDrawer({ opportunity, stageName, onClose }: Props) {
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-fg-muted">Email</dt>
-                <dd className="text-fg truncate">{opportunity.email || '—'}</dd>
+                <dd className="text-fg truncate">{display(pick('email'))}</dd>
               </div>
             </dl>
           </section>
@@ -75,47 +161,47 @@ export function OpportunityDrawer({ opportunity, stageName, onClose }: Props) {
             <dl className="space-y-1">
               <div className="flex justify-between gap-2">
                 <dt className="text-fg-muted">Zona</dt>
-                <dd className="text-fg truncate">{opportunity.zona || '—'}</dd>
+                <dd className="text-fg truncate">{display(pick('zona'))}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-fg-muted">Operación</dt>
-                <dd className="text-fg truncate">{opportunity.operacion || '—'}</dd>
+                <dd className="text-fg truncate">{display(pick('operacion'))}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-fg-muted">Presupuesto</dt>
-                <dd className="text-fg truncate">{opportunity.presupuesto_ia || '—'}</dd>
+                <dd className="text-fg truncate">{display(pick('presupuesto_ia'))}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-fg-muted">Ambientes</dt>
-                <dd className="text-fg truncate">{opportunity.ambientes || '—'}</dd>
+                <dd className="text-fg truncate">{display(pick('ambientes'))}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-fg-muted">Score</dt>
-                <dd className="text-fg truncate capitalize">{opportunity.score_lead || '—'}</dd>
+                <dd className="text-fg truncate capitalize">{display(pick('score_lead'))}</dd>
               </div>
             </dl>
           </section>
 
-          {opportunity.propiedad_tokko_id && (
+          {propiedadId && (
             <section>
               <h3 className="font-semibold text-xs uppercase text-fg-muted mb-2">Propiedad asignada</h3>
               <dl className="space-y-1">
                 <div className="flex justify-between gap-2">
                   <dt className="text-fg-muted">Título</dt>
-                  <dd className="text-fg truncate">{opportunity.titulo_propiedad || '—'}</dd>
+                  <dd className="text-fg truncate">{display(pick('titulo_propiedad'))}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt className="text-fg-muted">Precio</dt>
-                  <dd className="text-fg truncate">{opportunity.precio_propiedad || '—'}</dd>
+                  <dd className="text-fg truncate">{display(pick('precio_propiedad'))}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt className="text-fg-muted">Ubicación</dt>
-                  <dd className="text-fg truncate">{opportunity.ubicacion_propiedad || '—'}</dd>
+                  <dd className="text-fg truncate">{display(pick('ubicacion_propiedad'))}</dd>
                 </div>
-                {opportunity.link_propiedad && (
+                {pick('link_propiedad') && (
                   <div>
                     <a
-                      href={opportunity.link_propiedad}
+                      href={pick('link_propiedad') as string}
                       target="_blank"
                       rel="noreferrer"
                       className="text-brand hover:underline text-xs"

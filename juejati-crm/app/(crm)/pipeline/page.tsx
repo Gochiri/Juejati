@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { OpportunityDrawer } from '@/components/pipeline/OpportunityDrawer'
+import type { EnrichedFields } from '@/components/pipeline/OpportunityDrawer'
 import type { GHLLead } from '@/lib/ghl'
 import {
   getCachedPipelineData,
@@ -154,6 +155,42 @@ export default function PipelinePage() {
     loadFresh(false)
   }
 
+  /**
+   * Called by the drawer after it lazy-fetches a contact's full custom fields.
+   * Backfills both React state and the localStorage cache for ALL leads with
+   * matching contactId (a contact can have multiple opportunities) so the card's
+   * score dot and criteria line populate without an extra fetch.
+   */
+  function handleEnriched(enrichedContactId: string, enriched: EnrichedFields) {
+    setLeadsByStage((prev) => {
+      let changed = false
+      const next: Record<string, GHLLead[]> = {}
+      for (const k of Object.keys(prev)) {
+        next[k] = prev[k].map((l) => {
+          if (l.contactId !== enrichedContactId) return l
+          changed = true
+          return { ...l, ...enriched }
+        })
+      }
+      return changed ? next : prev
+    })
+    // Mirror the same backfill into localStorage so it survives reloads within the TTL window.
+    const cached = getCachedPipelineData()
+    if (!cached) return
+    let cacheChanged = false
+    const nextCache: Record<string, GHLLead[]> = {}
+    for (const k of Object.keys(cached.leadsByStage)) {
+      nextCache[k] = cached.leadsByStage[k].map((l) => {
+        if (l.contactId !== enrichedContactId) return l
+        cacheChanged = true
+        return { ...l, ...enriched }
+      })
+    }
+    if (cacheChanged) {
+      setCachedPipelineData({ pipeline: cached.pipeline, leadsByStage: nextCache })
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over) return
@@ -274,6 +311,7 @@ export default function PipelinePage() {
         opportunity={selectedOpp}
         stageName={selectedOpp ? stageNameById[selectedOpp.stageId || ''] || 'Sin etapa' : ''}
         onClose={() => setSelectedOpp(null)}
+        onEnriched={handleEnriched}
       />
     </div>
   )
