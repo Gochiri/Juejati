@@ -86,10 +86,12 @@ Cron autónomo que retoma conversaciones que se enfriaron. Reemplaza al workflow
 SR01 de GHL (que debe desactivarse para evitar mensajes duplicados).
 
 1. Solo corre en horario comercial (todos los días 9-21, hora Argentina — `isBusinessHours()`)
-2. Lista conversaciones vía `searchConversations()` (`GET /conversations/search`, último mensaje outbound)
-3. Por cada lead: filtra por silencio (≥48h, ≤30d), intentos previos (`lead_followups`) y tags de exclusión
-4. `analyzeLeadConversation()` (`generateObject`) clasifica el lead y decide si seguir y con qué mensaje
-5. Si corresponde → `sendMessage()` + registra en `message_log` y `lead_followups`
+2. Valida que estén configurados `GHL_FOLLOWUP_WORKFLOW_ID` y `GHL_FOLLOWUP_FRASE_FIELD_ID` (si no, se omite)
+3. Lista conversaciones vía `searchConversations()` (`GET /conversations/search`, último mensaje outbound)
+4. Por cada lead: filtra por silencio (≥48h, ≤30d), intentos previos (`lead_followups`) y tags de exclusión
+5. `analyzeLeadConversation()` (`generateObject`) clasifica el lead y produce `template_vars` (`nombre`, `frase`)
+6. Si corresponde → escribe `frase` en custom field (`updateContactFields`) + dispara workflow GHL
+   (`addContactToWorkflow`) + registra en `message_log` y `lead_followups`
 
 - **Scheduler**: `setInterval` cada `FOLLOWUP_INTERVAL_HOURS` (solo si `FOLLOWUP_ENABLED=true`)
 - **Disparo manual**: `POST /api/followup-cron` con Bearer `SYNC_SECRET`
@@ -98,29 +100,33 @@ SR01 de GHL (que debe desactivarse para evitar mensajes duplicados).
 - Al agotar los intentos se añade el tag `seguimiento_agotado`; si la IA decide no seguir, `seguimiento_descartado`
 - **Tabla** `lead_followups`: `contact_id`, `conversation_id`, `attempt`, `status` (`sent`/`skipped`), `reason`, `message`, `created_at`
 
-### ⚠️ Restricción de WhatsApp y redesign de la entrega (pendiente)
+### Entrega vía GHL (Modelo A — implementado)
 
-La entrega actual vía `sendMessage()` con **texto libre generado por la IA NO funciona**
-fuera de la ventana de servicio de WhatsApp. El número usa la WhatsApp Cloud API oficial:
-pasadas **24 h** desde el último mensaje entrante del lead, Meta solo permite enviar
-**plantillas pre-aprobadas** (HSM), no texto libre. Como el cron apunta a leads con ≥48 h
-de silencio, en la práctica **siempre** cae fuera de la ventana.
+El número usa la WhatsApp Cloud API oficial: pasadas **24 h** desde el último mensaje del lead,
+Meta solo permite **plantillas pre-aprobadas** (HSM), no texto libre. Como el cron apunta a
+leads con ≥48 h de silencio, **siempre** cae fuera de la ventana. Por eso la entrega NO usa
+`sendMessage()` con texto libre, sino que delega el envío de la plantilla a un workflow de GHL
+(GHL ya tiene la conexión autorizada al número; el envío directo a Meta con un System User token
+falla con `403 (#200)` porque el número está registrado bajo la app de GHL, no bajo la app propia).
 
-**Dirección acordada (Modelo A — el cron maneja la cadencia):**
+Flujo:
+1. `analyzeLeadConversation()` produce `template_vars`: `nombre` ({{1}}) y `frase` ({{2}}, frase
+   contextual de 1 oración que retoma la charla).
+2. El cron escribe `frase` en el custom field `GHL_FOLLOWUP_FRASE_FIELD_ID` (`updateContactFields`).
+3. El cron dispara el workflow `GHL_FOLLOWUP_WORKFLOW_ID` (`addContactToWorkflow` →
+   `POST /contacts/{id}/workflow/{workflowId}`).
+4. El workflow de GHL envía la plantilla `1_seguimiento` mapeando {{1}}→nombre del contacto y
+   {{2}}→el custom field de la frase.
+5. El cron re-analiza antes de cada intento (1/2/3); el conteo y el spacing de 48 h siguen en el
+   código (`lead_followups`).
 
-1. `analyzeLeadConversation()` deja de generar un mensaje libre. La IA analiza la
-   conversación y produce los **valores de las variables de la plantilla**
-   (nombre, zona, cuántas propiedades consultó, si quedó una visita pendiente,
-   última propiedad vista, etc.).
-2. El cron escribe esos valores en **custom fields de GHL** (`updateContactFields`).
-3. El cron **dispara un workflow de GHL** (`POST /contacts/{id}/workflow/{workflowId}`)
-   — falta agregar `addContactToWorkflow()` en `ghl.ts`.
-4. El workflow envía la plantilla, que referencia esos custom fields como variables.
-5. El cron re-analiza antes de cada intento (1/2/3); el conteo y el spacing de 48 h
-   siguen en el código (`lead_followups`), como hoy.
+**Plantilla `1_seguimiento` (es_AR), aprobada:**
+`Hola {{1}} 👋 Soy Sofía de Juejati. {{2}} ¿Seguimos buscando?`
 
-**Bloqueado por inputs del cliente:** texto exacto de la(s) plantilla(s) aprobada(s) y
-sus variables, e ID(s) del workflow de GHL. Sin eso no se puede cerrar el redesign.
+**Setup en GHL requerido:** crear el custom field de la frase y el workflow que envía la plantilla
+(trigger: "Added to workflow"; acción: enviar plantilla WhatsApp con el mapeo de variables).
+Configurar sus IDs en `GHL_FOLLOWUP_FRASE_FIELD_ID` y `GHL_FOLLOWUP_WORKFLOW_ID`.
+Desactivar el workflow nativo SR01 para evitar duplicados.
 
 ## Base de datos (Supabase + pgvector)
 

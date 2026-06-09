@@ -4,10 +4,16 @@ import {
   getConversationHistory,
   getContactById,
   addContactTag,
+  updateContactFields,
+  addContactToWorkflow,
 } from './ghl.js';
 import { analyzeLeadConversation } from './agent.js';
-import { sendFollowupTemplate } from './meta.js';
 import { logMessage, logError, recordFollowup, getFollowupHistory } from './admin-db.js';
+
+// GHL workflow that sends the approved WhatsApp template (1_seguimiento).
+const FOLLOWUP_WORKFLOW_ID = process.env.GHL_FOLLOWUP_WORKFLOW_ID || '';
+// GHL custom field that holds the AI-generated contextual phrase ({{2}} in the template).
+const FOLLOWUP_FRASE_FIELD_ID = process.env.GHL_FOLLOWUP_FRASE_FIELD_ID || '';
 
 const SILENCE_HOURS = Number(process.env.FOLLOWUP_SILENCE_HOURS) || 48;
 const MAX_ATTEMPTS = Number(process.env.FOLLOWUP_MAX_ATTEMPTS) || 3;
@@ -64,6 +70,11 @@ export async function runFollowupCron(): Promise<FollowupSummary> {
 
   if (!isBusinessHours()) {
     console.log('⏰ Follow-up cron: fuera de horario comercial, se omite.');
+    return summary;
+  }
+
+  if (!FOLLOWUP_WORKFLOW_ID || !FOLLOWUP_FRASE_FIELD_ID) {
+    console.error('⏰ Follow-up cron: faltan GHL_FOLLOWUP_WORKFLOW_ID y/o GHL_FOLLOWUP_FRASE_FIELD_ID, se omite.');
     return summary;
   }
 
@@ -131,14 +142,20 @@ export async function runFollowupCron(): Promise<FollowupSummary> {
         continue;
       }
 
-      await sendFollowupTemplate(contact.phone, analysis.template_vars);
+      // Modelo A: write the AI-generated phrase to a GHL custom field, then trigger
+      // the GHL workflow that sends the approved template referencing that field.
+      await updateContactFields(contactId, [
+        { id: FOLLOWUP_FRASE_FIELD_ID, field_value: analysis.template_vars.frase },
+      ]);
+      await addContactToWorkflow(contactId, FOLLOWUP_WORKFLOW_ID);
+
       const templateDesc = `[1_seguimiento] nombre=${analysis.template_vars.nombre} | ${analysis.template_vars.frase}`;
       await logMessage(contactId, 'outbound', templateDesc, 'WhatsApp').catch(() => {});
       await recordFollowup(contactId, conv.id || null, attempt, 'sent', analysis.motivo, templateDesc);
       if (attempt >= MAX_ATTEMPTS) await addContactTag(contactId, 'seguimiento_agotado').catch(() => {});
 
       summary.followedUp++;
-      console.log(`✅ Follow-up #${attempt} enviado a ${contactId} — ${templateDesc}`);
+      console.log(`✅ Follow-up #${attempt} disparado para ${contactId} — ${templateDesc}`);
 
       // Light rate-limit between GHL calls
       await new Promise(r => setTimeout(r, 400));
