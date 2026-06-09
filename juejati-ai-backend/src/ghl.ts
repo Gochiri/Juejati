@@ -180,6 +180,21 @@ export async function updateContactFields(contactId: string, customFields: { id:
   return res.json();
 }
 
+// Adds a contact to a GHL workflow, which fires its actions (e.g. send a WhatsApp template).
+export async function addContactToWorkflow(contactId: string, workflowId: string) {
+  const url = `${GHL_API_BASE}/contacts/${contactId}/workflow/${workflowId}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ eventStartTime: new Date().toISOString() }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GHL Error adding to workflow: ${res.status} ${res.statusText} - ${body}`);
+  }
+  return res.json();
+}
+
 export async function getContactById(contactId: string) {
   const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, { method: 'GET', headers });
   if (!res.ok) throw new Error(`GHL Error fetching contact: ${res.statusText}`);
