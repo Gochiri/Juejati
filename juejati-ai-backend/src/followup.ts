@@ -169,3 +169,63 @@ export async function runFollowupCron(): Promise<FollowupSummary> {
   console.log('⏰ Follow-up cron terminado:', summary);
   return summary;
 }
+
+export interface FollowupPhraseResult {
+  nombre: string;
+  frase: string;
+  debe_seguir: boolean;
+  estado_lead: string;
+  motivo: string;
+  attempt: number;
+}
+
+// Webhook-driven path (Modelo A): a GHL workflow calls this before its "Send WhatsApp"
+// step. Analyzes the conversation, writes the AI-generated phrase ({{2}}) to the GHL
+// custom field, and returns the values so the workflow can map/branch on them.
+export async function generateFollowupPhrase(contactId: string): Promise<FollowupPhraseResult> {
+  if (!FOLLOWUP_FRASE_FIELD_ID) {
+    throw new Error('GHL_FOLLOWUP_FRASE_FIELD_ID is required');
+  }
+
+  const rawHistory: any[] = await getConversationHistory(contactId, 20);
+  const history: CoreMessage[] = [...rawHistory]
+    .reverse()
+    .map(m => ({
+      role: msgDirection(m) === 'inbound' ? 'user' : 'assistant',
+      content: m.body || m.messageText || m.text || '',
+    } as CoreMessage))
+    .filter(m => m.content !== '');
+
+  // Attempt number = follow-ups already sent since the lead's last reply, + 1
+  const followups = await getFollowupHistory(contactId);
+  const attempt = followups.filter(f => f.status === 'sent').length + 1;
+
+  const analysis = await analyzeLeadConversation(contactId, history, attempt);
+
+  // Persist the phrase so the workflow's template action can reference the field
+  await updateContactFields(contactId, [
+    { id: FOLLOWUP_FRASE_FIELD_ID, field_value: analysis.template_vars.frase },
+  ]);
+
+  const desc = `[1_seguimiento] nombre=${analysis.template_vars.nombre} | ${analysis.template_vars.frase}`;
+  await recordFollowup(
+    contactId,
+    null,
+    attempt,
+    analysis.debe_seguir ? 'sent' : 'skipped',
+    analysis.motivo,
+    desc,
+  ).catch(() => {});
+
+  console.log(`🪝 Follow-up phrase para ${contactId} (intento ${attempt}, seguir=${analysis.debe_seguir}) — ${desc}`);
+
+  return {
+    nombre: analysis.template_vars.nombre,
+    frase: analysis.template_vars.frase,
+    debe_seguir: analysis.debe_seguir,
+    estado_lead: analysis.estado_lead,
+    motivo: analysis.motivo,
+    attempt,
+  };
+}
+
