@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand */
+    --brand:        0.62 0.16 50;
+    --brand-hover:  0.55 0.17 50;
+    --brand-fg:     0.98 0.02 50;
+
+    /* Neutrals — light, tintados al ámbar */
+    --bg:           0.99 0.005 50;
+    --surface:      0.97 0.008 50;
+    --surface-2:    0.95 0.010 50;
+    --border:       0.92 0.012 50;
+    --border-strong:0.85 0.015 50;
+
+    /* Foreground */
+    --fg:           0.18 0.020 50;
+    --fg-muted:     0.48 0.015 50;
+    --fg-subtle:    0.65 0.012 50;
+
+    /* Signal */
+    --success:      0.62 0.14 145;
+    --warning:      0.74 0.16 75;
+    --danger:       0.58 0.21 27;
+    --info:         0.58 0.14 240;
+
+    --radius:       6px;
+    --radius-lg:    10px;
+  }
+
+  .dark {
+    --bg:           0.13 0.008 50;
+    --surface:      0.16 0.010 50;
+    --surface-2:    0.20 0.012 50;
+    --border:       0.24 0.012 50;
+    --border-strong:0.32 0.014 50;
+
+    --fg:           0.97 0.012 50;
+    --fg-muted:     0.65 0.012 50;
+    --fg-subtle:    0.48 0.012 50;
+
+    --brand:        0.70 0.17 50;
+    --brand-hover:  0.76 0.16 50;
+    --brand-fg:     0.13 0.04 50;
+  }
+
+  * {
+    border-color: oklch(var(--border));
+  }
+
+  body {
+    background: oklch(var(--bg));
+    color: oklch(var(--fg));
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  ::selection {
+    background: oklch(var(--brand) / 0.25);
+    color: oklch(var(--fg));
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(var(--border-strong));
+    border-radius: 999px;
+    border: 2px solid oklch(var(--bg));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(var(--fg-subtle));
+  }
+}
