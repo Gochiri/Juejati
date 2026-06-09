@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { runAgent, handleStaleOpportunity } from './agent.js';
+import { runAgent } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
 import { runFollowupCron, generateFollowupPhrase } from './followup.js';
@@ -99,43 +99,23 @@ app.post('/webhook/ghl', (req, res) => {
 });
 
 // Endpoint to handle Follow-Up for stale opportunities
+// Endpoint legacy — NEUTRALIZADO. Antes generaba y ENVIABA texto libre vía
+// sendMessage() (fallaba fuera de la ventana de 24h de WhatsApp). Ahora se comporta
+// como /api/followup-phrase: solo genera y escribe la frase en el custom field, sin
+// enviar. Así, si algún workflow viejo sigue apuntando acá, no manda mensajes rotos.
 app.post('/api/followup', async (req, res) => {
+  const body = req.body || {};
+  const contactId = body.contact_id || body.contactId || body.contactID;
+  if (!contactId) {
+    return res.status(400).json({ error: 'Missing contact_id' });
+  }
   try {
-    const payload = req.body;
-    const contactId = payload.contact_id;
-    const phone = payload.phone || '';
-    const channel = payload.channel || 'WhatsApp'; // Default if not provided
-
-    if (!contactId) {
-      return res.status(400).send({ error: 'Missing contact_id' });
-    }
-
-    console.log(`⏳ Handling stale opportunity for contact ${contactId} via ${channel}`);
-
-    // Acknowledge quickly to GHL Workflow
-    res.status(200).send({ success: true, message: 'Follow-up process started' });
-
-    // 1. Fetch History
-    const rawHistory = await getConversationHistory(contactId, 10);
-
-    // Convert GHL history to Vercel AI SDK format
-    const history: CoreMessage[] = rawHistory.reverse().map((msg: any) => ({
-      role: msg.direction === 'inbound' ? 'user' : 'assistant',
-      content: msg.body || msg.messageText || ''
-    })).filter((m: CoreMessage) => m.content !== '');
-
-    // 2. Generate Follow-up via LLM
-    console.log(`🤖 Generating follow-up for ${contactId}...`);
-    const { text: followUpMessage } = await handleStaleOpportunity(contactId, history);
-
-    // 3. Send text response to GHL
-    await sendMessage(contactId, followUpMessage, channel, phone);
-    logMessage(contactId, 'outbound', followUpMessage, channel).catch(() => {});
-
-    console.log(`✅ Successfully sent follow-up to ${contactId}`);
+    const result = await generateFollowupPhrase(contactId);
+    res.json({ success: true, ...result });
   } catch (err: any) {
-    console.error('❌ Error handling follow-up:', err);
-    logError('followup', err.message, err.stack).catch(() => {});
+    console.error('❌ Follow-up (legacy) error:', err);
+    logError('followup', err.message, err.stack, { contactId }).catch(() => {});
+    res.status(500).json({ error: err.message });
   }
 });
 
