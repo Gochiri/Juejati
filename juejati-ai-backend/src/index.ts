@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { runAgent, handleStaleOpportunity } from './agent.js';
 import { getConversationHistory, sendMessage } from './ghl.js';
 import { syncProperties } from './sync.js';
-import { runFollowupCron } from './followup.js';
+import { runFollowupCron, generateFollowupPhrase } from './followup.js';
 import { logMessage, logError, initAdminTables, saveContactName } from './admin-db.js';
 import { getContactName } from './ghl.js';
 import adminRouter from './admin-routes.js';
@@ -202,6 +202,30 @@ app.post('/api/followup-cron', async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     followupRunning = false;
+  }
+});
+
+// Webhook llamado desde un workflow de GHL antes del paso "Send WhatsApp".
+// Analiza la conversación, escribe la frase ({{2}}) en el custom field y devuelve
+// los valores para que el workflow los mapee/condicione. Responde sincrónicamente
+// para que el custom field ya esté escrito cuando el workflow envíe la plantilla.
+app.post('/api/followup-phrase', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!process.env.SYNC_SECRET || token !== process.env.SYNC_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const body = req.body || {};
+  const contactId = body.contact_id || body.contactId || body.contactID;
+  if (!contactId) {
+    return res.status(400).json({ error: 'Missing contact_id' });
+  }
+  try {
+    const result = await generateFollowupPhrase(contactId);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error('❌ Follow-up phrase error:', err);
+    logError('followup-phrase', err.message, err.stack, { contactId }).catch(() => {});
+    res.status(500).json({ error: err.message });
   }
 });
 

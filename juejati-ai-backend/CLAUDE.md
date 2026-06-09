@@ -41,8 +41,9 @@ seed.sql      — Datos de prueba
 | Método | Path | Descripción |
 |--------|------|-------------|
 | POST | `/webhook/ghl` | Webhook principal de GHL — recibe mensajes entrantes |
-| POST | `/api/followup` | Follow-up para oportunidades sin respuesta (llamado desde workflow GHL) |
-| POST | `/api/followup-cron` | Dispara el cron de seguimiento de leads (Bearer `SYNC_SECRET`) |
+| POST | `/api/followup` | Follow-up texto libre (legacy, llamado desde workflow GHL) |
+| POST | `/api/followup-phrase` | Genera la frase IA ({{2}}) y la escribe en el custom field (Bearer `SYNC_SECRET`) |
+| POST | `/api/followup-cron` | Dispara el cron autónomo de seguimiento (Bearer `SYNC_SECRET`) |
 | POST | `/sync` | Dispara sync manual Tokko → Supabase |
 | GET | `/health` | Health check |
 
@@ -100,33 +101,43 @@ SR01 de GHL (que debe desactivarse para evitar mensajes duplicados).
 - Al agotar los intentos se añade el tag `seguimiento_agotado`; si la IA decide no seguir, `seguimiento_descartado`
 - **Tabla** `lead_followups`: `contact_id`, `conversation_id`, `attempt`, `status` (`sent`/`skipped`), `reason`, `message`, `created_at`
 
-### Entrega vía GHL (Modelo A — implementado)
+### Entrega vía GHL (Modelo A — webhook desde el workflow)
 
 El número usa la WhatsApp Cloud API oficial: pasadas **24 h** desde el último mensaje del lead,
-Meta solo permite **plantillas pre-aprobadas** (HSM), no texto libre. Como el cron apunta a
-leads con ≥48 h de silencio, **siempre** cae fuera de la ventana. Por eso la entrega NO usa
-`sendMessage()` con texto libre, sino que delega el envío de la plantilla a un workflow de GHL
-(GHL ya tiene la conexión autorizada al número; el envío directo a Meta con un System User token
-falla con `403 (#200)` porque el número está registrado bajo la app de GHL, no bajo la app propia).
+Meta solo permite **plantillas pre-aprobadas** (HSM), no texto libre. Como los follow-ups apuntan
+a leads con ≥48 h de silencio, **siempre** caen fuera de la ventana. El envío directo a Meta con
+un System User token falla con `403 (#200)` porque el número está registrado bajo la app de GHL,
+no bajo la app propia. Por eso **GHL envía la plantilla** (ya tiene la conexión autorizada al
+número) y la IA solo aporta la personalización.
 
-Flujo:
-1. `analyzeLeadConversation()` produce `template_vars`: `nombre` ({{1}}) y `frase` ({{2}}, frase
-   contextual de 1 oración que retoma la charla).
-2. El cron escribe `frase` en el custom field `GHL_FOLLOWUP_FRASE_FIELD_ID` (`updateContactFields`).
-3. El cron dispara el workflow `GHL_FOLLOWUP_WORKFLOW_ID` (`addContactToWorkflow` →
-   `POST /contacts/{id}/workflow/{workflowId}`).
-4. El workflow de GHL envía la plantilla `1_seguimiento` mapeando {{1}}→nombre del contacto y
-   {{2}}→el custom field de la frase.
-5. El cron re-analiza antes de cada intento (1/2/3); el conteo y el spacing de 48 h siguen en el
-   código (`lead_followups`).
+**Cadencia/enrollment**: manejados por los workflows existentes de GHL (`[CRM] - 041-A/B/C:
+Seguimiento 1/2/7 días`). El backend NO decide a quién/cuándo seguir en este modelo.
+
+**Flujo (por cada paso de cadencia del workflow):**
+1. El workflow de GHL, antes del paso "Send WhatsApp", llama por **Webhook** a
+   `POST /api/followup-phrase` con `{ "contact_id": "{{contact.id}}" }` y header
+   `Authorization: Bearer <SYNC_SECRET>`.
+2. El endpoint corre `generateFollowupPhrase()`: trae el historial, `analyzeLeadConversation()`
+   produce `nombre` y `frase` (frase contextual de 1 oración), escribe `frase` en el custom field
+   `GHL_FOLLOWUP_FRASE_FIELD_ID` y responde sincrónicamente con
+   `{ frase, nombre, debe_seguir, estado_lead, motivo, attempt }`.
+3. El workflow sigue al paso "Send WhatsApp" con la plantilla `1_seguimiento`, mapeando
+   {{1}}→First Name del contacto y {{2}}→el custom field de la frase (ya escrito).
+4. Opcional: el workflow puede ramificar según `debe_seguir`/`estado_lead` de la respuesta del
+   webhook para no enviar a leads clasificados como perdidos.
 
 **Plantilla `1_seguimiento` (es_AR), aprobada:**
 `Hola {{1}} 👋 Soy Sofía de Juejati. {{2}} ¿Seguimos buscando?`
 
-**Setup en GHL requerido:** crear el custom field de la frase y el workflow que envía la plantilla
-(trigger: "Added to workflow"; acción: enviar plantilla WhatsApp con el mapeo de variables).
-Configurar sus IDs en `GHL_FOLLOWUP_FRASE_FIELD_ID` y `GHL_FOLLOWUP_WORKFLOW_ID`.
-Desactivar el workflow nativo SR01 para evitar duplicados.
+**Setup en GHL requerido:**
+- Custom field de la frase ya creado → `GHL_FOLLOWUP_FRASE_FIELD_ID=9ujS6oUn5FhhY88GS02n`.
+- En cada workflow de seguimiento, agregar un paso **Webhook** (POST a `/api/followup-phrase`,
+  body `{ "contact_id": "{{contact.id}}" }`, header Bearer `SYNC_SECRET`) **antes** del paso
+  "Send WhatsApp", y mapear {{2}} al custom field.
+
+**`/api/followup-cron` + `runFollowupCron()`**: cron autónomo alternativo (decide a quién seguir
+y dispara `GHL_FOLLOWUP_WORKFLOW_ID`). NO se usa en el modelo webhook; dejar `FOLLOWUP_ENABLED=false`
+para evitar envíos duplicados con los workflows de GHL.
 
 ## Base de datos (Supabase + pgvector)
 
