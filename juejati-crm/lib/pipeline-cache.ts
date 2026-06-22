@@ -1,6 +1,6 @@
 import type { GHLLead, GHLPipeline } from './ghl'
 
-const CACHE_KEY = 'juejati:pipeline:v1'
+const CACHE_KEY = 'juejati:pipeline:v2'
 const TTL_MS = 5 * 60 * 1000
 
 export interface CachedPipelineData {
