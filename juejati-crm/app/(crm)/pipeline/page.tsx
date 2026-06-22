@@ -20,6 +20,7 @@ import {
   clearCachedPipelineData,
   updateCachedLeadStage,
 } from '@/lib/pipeline-cache'
+import { ORIGIN_CATEGORIES, UNKNOWN_ORIGIN, getLeadOrigin } from '@/lib/origin'
 
 interface Stage {
   id: string
@@ -49,6 +50,8 @@ export default function PipelinePage() {
   const [error, setError] = useState('')
   const [selectedOpp, setSelectedOpp] = useState<GHLLead | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  // 'all' = no filter; 'unknown' = leads we couldn't classify; otherwise an ORIGIN_CATEGORIES key
+  const [originFilter, setOriginFilter] = useState<string>('all')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const draggingRef = useRef(false)
@@ -256,16 +259,60 @@ export default function PipelinePage() {
   const stageNameById: Record<string, string> = {}
   pipeline.stages.forEach((s) => (stageNameById[s.id] = s.name))
   stageNameById[SIN_ETAPA] = 'Sin etapa'
-  const totalLeads = Object.values(leadsByStage).reduce((acc, arr) => acc + arr.length, 0)
+
+  // Count leads per origin category (across all stages) for the filter dropdown labels.
+  const originCounts: Record<string, number> = { all: 0, unknown: 0 }
+  ORIGIN_CATEGORIES.forEach((c) => (originCounts[c.key] = 0))
+  for (const stageLeads of Object.values(leadsByStage)) {
+    for (const lead of stageLeads) {
+      originCounts.all++
+      const cat = getLeadOrigin(lead)
+      const key = cat?.key ?? 'unknown'
+      originCounts[key] = (originCounts[key] ?? 0) + 1
+    }
+  }
+
+  // Apply the origin filter to each stage's leads.
+  const filteredLeadsByStage: Record<string, GHLLead[]> = {}
+  for (const [stageId, stageLeads] of Object.entries(leadsByStage)) {
+    if (originFilter === 'all') {
+      filteredLeadsByStage[stageId] = stageLeads
+    } else {
+      filteredLeadsByStage[stageId] = stageLeads.filter((l) => {
+        const cat = getLeadOrigin(l)
+        return originFilter === 'unknown' ? cat === null : cat?.key === originFilter
+      })
+    }
+  }
+  const totalLeads = Object.values(filteredLeadsByStage).reduce((acc, arr) => acc + arr.length, 0)
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="px-4 py-3 bg-surface border-b border-border shrink-0 flex items-baseline justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-bold text-lg text-fg">Pipeline — {pipeline.name}</h1>
-          <p className="text-xs text-fg-subtle">{totalLeads} leads</p>
+          <p className="text-xs text-fg-subtle">
+            {totalLeads} {originFilter === 'all' ? 'leads' : `de ${originCounts.all} leads`}
+          </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          <select
+            value={originFilter}
+            onChange={(e) => setOriginFilter(e.target.value)}
+            className="text-xs bg-surface border border-border rounded px-2 py-1 text-fg focus:outline-none focus:ring-1 focus:ring-brand"
+            aria-label="Filtrar por origen"
+            title="Filtrar leads por origen"
+          >
+            <option value="all">Todos los orígenes ({originCounts.all})</option>
+            {ORIGIN_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key} disabled={originCounts[c.key] === 0}>
+                {c.label} ({originCounts[c.key] ?? 0})
+              </option>
+            ))}
+            <option value="unknown" disabled={originCounts.unknown === 0}>
+              {UNKNOWN_ORIGIN.label} ({originCounts.unknown})
+            </option>
+          </select>
           {loadingMsg && <p className="text-xs text-fg-subtle">{loadingMsg}</p>}
           <button
             onClick={handleRefresh}
@@ -298,7 +345,7 @@ export default function PipelinePage() {
                 key={col.key}
                 stageId={col.key}
                 stageName={col.name}
-                leads={leadsByStage[col.key] || []}
+                leads={filteredLeadsByStage[col.key] || []}
                 onCardClick={setSelectedOpp}
                 draggingRef={draggingRef}
               />
@@ -375,6 +422,7 @@ function DraggableCard({ lead, fromStageId, onClick, draggingRef }: CardProps) {
   const criteria = [lead.zona && `📍 ${lead.zona}`, lead.ambientes && `${lead.ambientes} amb`]
     .filter(Boolean)
     .join(' · ')
+  const origin = getLeadOrigin(lead)
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
@@ -397,7 +445,17 @@ function DraggableCard({ lead, fromStageId, onClick, draggingRef }: CardProps) {
       <div className="flex items-start gap-2">
         {dotClass && <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${dotClass}`} />}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-fg truncate">{lead.name}</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold text-sm text-fg truncate">{lead.name}</p>
+            {origin && (
+              <span
+                className={`text-[10px] leading-none px-1.5 py-0.5 rounded border shrink-0 ${origin.badgeClass}`}
+                title={`Origen: ${origin.label}`}
+              >
+                {origin.label}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-fg-muted">{lead.phone || '—'}</p>
           {criteria && <p className="text-xs text-fg-subtle mt-1 truncate">{criteria}</p>}
           {lead.propiedad_tokko_id && (

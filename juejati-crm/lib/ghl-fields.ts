@@ -14,6 +14,7 @@ export const GHL_FIELD_IDS = {
   ubicacion_propiedad:      'XJvbVGNyvhnghesdLIYd',
   score_lead:               'zLRaEQ5pm9fWvKJsnoIo',
   link_propiedad:           'XXEy7AlJmE9PJu1bOQKs',
+  origen_lead:              'JpyQySFLxOqx65JHYmEn',
 } as const
 
 export const GHL_API_BASE = 'https://services.leadconnectorhq.com'

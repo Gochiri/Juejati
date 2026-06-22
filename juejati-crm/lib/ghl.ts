@@ -21,6 +21,8 @@ export interface GHLLead {
   precio_propiedad?: string | null
   ubicacion_propiedad?: string | null
   link_propiedad?: string | null
+  origen_lead?: string | null
+  tags?: string[]
 }
 
 export interface GHLMessage {
@@ -56,6 +58,8 @@ function mapOpportunity(opp: any): GHLLead {
     precio_propiedad: get(GHL_FIELD_IDS.precio_propiedad),
     ubicacion_propiedad: get(GHL_FIELD_IDS.ubicacion_propiedad),
     link_propiedad: get(GHL_FIELD_IDS.link_propiedad),
+    origen_lead: get(GHL_FIELD_IDS.origen_lead),
+    tags: Array.isArray(contact.tags) ? contact.tags : [],
   }
 }
 
@@ -125,6 +129,8 @@ export async function fetchLeads(params: {
         precio_propiedad: get(GHL_FIELD_IDS.precio_propiedad),
         ubicacion_propiedad: get(GHL_FIELD_IDS.ubicacion_propiedad),
         link_propiedad: get(GHL_FIELD_IDS.link_propiedad),
+        origen_lead: get(GHL_FIELD_IDS.origen_lead),
+        tags: Array.isArray(c.tags) ? c.tags : [],
       }
     })
     return { leads, total: data.meta?.total || leads.length, hasMore: false }
